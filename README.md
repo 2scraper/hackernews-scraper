@@ -70,6 +70,8 @@ key, no proxy, no cookie and no account:
 | headful Chromium (under Xvfb), Playwright | served, 1 page tried |
 | the 2Captcha Scraper API | served, `$0.0005` a task, 2 tasks run |
 | Playwright with a 2Captcha fingerprint (`--fingerprint`, country DE) | served, 1 page tried |
+| a 2Captcha Scraping Browser profile (`--cdp-endpoint`), Playwright and pyppeteer | served, a listing page and a 71-comment thread |
+| a 2Captcha residential proxy (`--proxy`), Playwright and pyppeteer | served, 1 page each (pyppeteer answered the proxy's 407 itself) |
 
 There is no captcha and no challenge on any page this scraper reads, and none
 was met: **0** challenge or captcha markers on any served page in the
@@ -278,8 +280,9 @@ placeholders, everything else is what the site served.
 
 CI runs the suite on the oldest and newest supported Python, installs each
 engine in its own virtualenv, and builds the Docker image and checks that it
-launches Chromium. **The image was not built while this was written** (no access
-to a Docker daemon on the machine used), so that job is its first build.
+launches Chromium. The image was built and run locally on 2026-09-30: `--help`
+answers, Chromium 153 launches, a `--mode user` run inside it wrote its three
+files, and the image holds no `.env`, test suite or fixtures.
 
 ```bash
 docker build -t hackernews-scraper .

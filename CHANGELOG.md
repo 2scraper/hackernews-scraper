@@ -64,6 +64,15 @@ three browser engines and the 2Captcha Scraper API over one shared fetch loop.
 - On a closed 71-comment thread and on a profile, Playwright, Selenium and
   pyppeteer wrote identical rows; Playwright and the Scraper API wrote identical
   rows for the thread.
+- Docker: the image builds, `--help` answers, Chromium launches, a `--mode user`
+  run inside it writes its files, and it carries no `.env`, tests or fixtures.
+- `--cdp-endpoint` (a 2Captcha Scraping Browser profile) served a listing page
+  and a 71-comment thread through Playwright, and a listing page through
+  pyppeteer; Selenium refused a credentialled endpoint with exit 2, as designed.
+- `--proxy` (a 2Captcha residential proxy) served one page through Playwright
+  and pyppeteer; pyppeteer answered the proxy's real 407 through
+  `Fetch.authRequired`. Selenium's credentialled proxy was stripped with a
+  warning and the run exited 5 (`unknown` page), as documented.
 - A run started at `?p=25` reached the last page (`?p=26`, no More link) and
   stopped `complete`. A cursor list (`/newest`, `/jobs`) was walked over three and
   two pages. Two workers on a `?p=N` list fetched pages 2 and 3 together.
@@ -84,20 +93,14 @@ three browser engines and the 2Captcha Scraper API over one shared fetch loop.
 
 ### Not verified
 
-- **The Docker image was not built.** There was no access to a Docker daemon on
-  the machine used; the first build is the CI `docker` job.
 - **The canary has not run.** The repository had not been pushed.
 - **HTTP 403 and the 503 throttle were never seen**, so those code paths are
   exercised by the fake driver only.
 - **`--fingerprint` was not read back out of the page**, and only the
   Playwright copy of it was run (one page, served). The Selenium and pyppeteer
   copies were not.
-- **`--cdp-endpoint` and `--proxy` were not run**: no working Scraping Browser
-  profile or proxy was available. The pyppeteer engine answers a proxy's 407
-  through `Fetch.authRequired` rather than `page.authenticate` (which no longer
-  works on current Chromium); it was exercised against a local server with no
-  proxy and has never met a real 407. Selenium's refusal of a credentialled
-  endpoint is unchanged family code.
+- **`--cdp-endpoint` with Selenium** cannot be used by design; `--concurrency`
+  through a remote profile is refused by design and was not run.
 - Headless was served on every run; headful was tried once. Neither was found to
   matter, which is one page and not a comparison.
 - Python 3.9, the floor this claims, was not available locally; the CI matrix
