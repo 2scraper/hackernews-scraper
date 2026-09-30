@@ -1,0 +1,62 @@
+name: Site changed / markup broke
+description: news.ycombinator.com changed its markup and the parser no longer matches.
+labels: ["site-change"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is the most common way a scraper stops working, and it is worth
+        its own report because the fix is different from a code bug:
+        something on news.ycombinator.com moved.
+
+        Useful to know before filing: this repo parses the site's
+        server-rendered HTML. Rows are read by class token (comment rows
+        carry extra classes such as `coll` and `noshow`), so a break is
+        usually a renamed class or a changed page layout.
+
+  - type: dropdown
+    id: what_broke
+    attributes:
+      label: What stopped matching
+      options:
+        - 0 rows on a page that visibly has rows on the site
+        - A specific column is null or wrong on every row
+        - Pagination stops early or repeats rows
+        - A comment tree comes back incomplete or in the wrong shape
+        - Every run is refused with HTTP 403
+        - Something else
+    validations:
+      required: true
+
+  - type: input
+    id: query
+    attributes:
+      label: Mode and query
+      description: The mode and flags (or --url), and where you ran it from.
+      placeholder: "--mode listing --url https://news.ycombinator.com/newest --pages 2"
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: |
+        Whichever of these you can get. A capture beats a description.
+
+        - The page as the parser saw it: re-run with
+          `--dump-html page.html` and paste the few rows that show the
+          problem. It contains usernames and strangers' comment text, so
+          remove anything you would not want public.
+        - For a column problem: the value you got, and the value the site shows.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: >-
+        Whether it reproduces on a second engine, whether it reproduces from a
+        different country, and when it last worked.

@@ -1,0 +1,278 @@
+"""
+env_config.py
+--------------
+Reads a `.env` file sitting next to the scripts, so credentials live in one
+place instead of being retyped into every command line.
+
+Two reasons this is hand-rolled rather than `python-dotenv`:
+
+1. **No new dependency.** Every engine here already refuses to be a heavy
+   install, and a credential loader is about thirty lines. If `python-dotenv`
+   *is* installed it gets used instead, so a project that already depends on it
+   keeps its own behaviour.
+2. **A secret in argv is visible to anything that can run `ps`.** Passing
+   `--twocaptcha-key sk_live_...` leaks the key to every other process on the
+   machine and into shell history. Reading it from the environment does not.
+
+Precedence, highest first:
+
+    explicit CLI flag  >  real environment variable  >  .env file  >  default
+
+That order matters: a `.env` must never silently override something the caller
+typed, and an already-exported variable (CI secret, `direnv`, a shell profile)
+must never be clobbered by a file someone forgot to delete.
+
+Nothing here is required. With no `.env` and no environment variables the
+scripts behave exactly as before.
+"""
+
+import logging
+import os
+import re
+import sys
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+# Recognised keys, and which CLI destination each one backs.
+# Keeping this explicit means a typo in .env is reported rather than ignored.
+ENV_KEYS = {
+    "TWOCAPTCHA_KEY": "twocaptcha_key",
+    "HACKERNEWS_CDP_ENDPOINT": "cdp_endpoint",
+    "HACKERNEWS_PROXY": "proxy",
+    "HACKERNEWS_URL": "url",
+}
+# Deliberately NOT here: an output prefix. `--out` already carries a non-empty
+# default, so `apply()` would never see it as unset and the variable would be
+# silently ignored — a setting that looks configurable and is not.
+
+# Values that look real but are the placeholder from .env.example.
+# A placeholder that reaches the API produces a confusing auth error a long way
+# from its cause, so it is caught here instead.
+_PLACEHOLDERS = {
+    "your_2captcha_api_key_here",
+    "your_api_key_here",
+    "changeme",
+    "",
+}
+
+# ...and the SHAPE of a placeholder, which a literal set cannot cover.
+#
+# This repo's `.env.example` documents the two credentialled URLs the way the
+# vendor documents them, with the parts you fill in written in braces:
+#
+#     ws://{login}-zone-scraping_browser-country-de-pid-{profileId}:{password}@cb.2captcha.com:9222
+#     http://{user}:{password}@ap.proxy.2captcha.com:2334
+#
+# A literal-only check reported both of those as CONFIGURED, so `cp
+# .env.example .env` followed by a run connected to cb.2captcha.com with the
+# string `{login}-zone-…` as its username and got a 401 — a confusing failure
+# a long way from its cause, which is precisely what §3's rule exists to
+# prevent. Any `{…}` left in a value means the line was never filled in.
+_BRACED_PLACEHOLDER_RE = re.compile(r"\{[A-Za-z_][A-Za-z0-9_]*\}")
+
+_loaded_from = None
+
+
+def _parse_line(line):
+    """Return (key, value) or None. Understands `export K=V`, quotes, # comments."""
+    line = line.strip()
+    if not line or line.startswith("#"):
+        return None
+    if line.startswith("export "):
+        line = line[len("export "):].strip()
+    if "=" not in line:
+        return None
+    key, _, value = line.partition("=")
+    key = key.strip()
+    value = value.strip()
+    # Strip one matching pair of quotes; leave inner ones alone.
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+        value = value[1:-1]
+    else:
+        # Unquoted values may carry a trailing comment.
+        value = value.split(" #")[0].strip()
+    if not key:
+        return None
+    return key, value
+
+
+def load_env(path=None, override=False):
+    """Load `.env` into os.environ. Returns the path used, or None.
+
+    `override=False` (the default) means an already-set environment variable
+    wins over the file.
+    """
+    global _loaded_from
+
+    if path is None:
+        path = Path(__file__).resolve().parent / ".env"
+    path = Path(path)
+
+    if not path.is_file():
+        return None
+
+    # Defer to python-dotenv when the user already has it: their version may
+    # support syntax this parser does not (multi-line values, interpolation).
+    try:
+        from dotenv import load_dotenv  # type: ignore
+        load_dotenv(path, override=override)
+        _loaded_from = str(path)
+        logger.debug("Loaded %s via python-dotenv", path)
+        return str(path)
+    except ImportError:
+        pass
+
+    count = 0
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        parsed = _parse_line(raw)
+        if not parsed:
+            continue
+        key, value = parsed
+        if key in os.environ and not override:
+            continue
+        os.environ[key] = value
+        count += 1
+
+    _loaded_from = str(path)
+    logger.debug("Loaded %d value(s) from %s", count, path)
+    return str(path)
+
+
+def unknown_keys(path=None):
+    """Keys present in .env that nothing in this project reads.
+
+    Usually a typo — `TWO_CAPTCHA_KEY`, `HACKERNEWS_CDP` — which otherwise fails
+    silently as "the key just isn't being picked up".
+    """
+    if path is None:
+        path = Path(__file__).resolve().parent / ".env"
+    path = Path(path)
+    if not path.is_file():
+        return []
+    found = []
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        parsed = _parse_line(raw)
+        if parsed and parsed[0] not in ENV_KEYS:
+            found.append(parsed[0])
+    return found
+
+
+def env_value(name):
+    """Read one recognised variable, treating .env.example placeholders as unset."""
+    value = os.environ.get(name)
+    if value is None:
+        return None
+    stripped = value.strip()
+    if not stripped:
+        # Empty is not the same as "you left the example text in". An unset
+        # GitHub Actions secret arrives as an empty string, so warning here
+        # would print "put your real value in .env" on every canary run that
+        # deliberately has no proxy — and a warning that fires when nothing is
+        # wrong teaches people to ignore warnings.
+        return None
+    if stripped.lower() in _PLACEHOLDERS:
+        logger.warning(
+            "%s is still set to the placeholder from .env.example — treating it "
+            "as unset. Put your real value in .env.", name)
+        return None
+    placeholder = _BRACED_PLACEHOLDER_RE.search(stripped)
+    if placeholder:
+        # Named, not quoted whole: the value can be a credentialled URL, and
+        # printing it would put a real password in a log the moment someone's
+        # password happens to contain a brace.
+        logger.warning(
+            "%s still contains the placeholder %s from .env.example — treating "
+            "it as unset. Fill in the real value in .env; a placeholder sent "
+            "to the API produces a 401 a long way from its cause.",
+            name, placeholder.group(0))
+        return None
+    return stripped
+
+
+def _dests_given_on_argv(dests, argv=None):
+    """Which of `dests` the caller actually typed, empty value included.
+
+    `apply()` fills any destination that is still FALSY, which cannot tell
+    "not given" from "given as empty" -- and that made a `.env` setting
+    impossible to switch off from the command line. `--cdp-endpoint ''` is
+    falsy, so the file's value was put straight back and the run went to the
+    remote browser the caller had just asked it not to use. There was no
+    spelling of "ignore what the file says" at all.
+
+    That matters wherever a local browser and a remote one are both
+    first-class, as they are here: the site needs neither, so switching
+    between them is routine rather than exceptional.
+
+    Scanning argv is the smallest fix that keeps §3's precedence intact --
+    explicit flag, then exported variable, then `.env`, then default -- with
+    "explicit" now meaning what the caller typed rather than what happens to
+    be truthy.
+    """
+    argv = sys.argv[1:] if argv is None else argv
+    typed = set()
+    for dest in dests:
+        flag = "--" + dest.replace("_", "-")
+        if any(a == flag or a.startswith(flag + "=") for a in argv):
+            typed.add(dest)
+    return typed
+
+
+def apply(args, keys=None, quiet=False):
+    """Fill unset argparse destinations from the environment.
+
+    Call once, right after `parse_args()`. Only fills a destination that the
+    parser actually defines, that the caller did not type, and that is still
+    falsy -- so an explicit flag always wins, including an explicitly empty
+    one.
+    """
+    load_env()
+
+    mapping = keys or ENV_KEYS
+    typed = _dests_given_on_argv(set(mapping.values()))
+
+    for env_name, dest in mapping.items():
+        if not hasattr(args, dest):
+            continue
+        if dest in typed:
+            if not quiet and env_value(env_name):
+                logger.info("Ignoring %s from the environment: --%s was given "
+                            "on the command line", env_name,
+                            dest.replace("_", "-"))
+            continue
+        if getattr(args, dest):
+            continue
+        value = env_value(env_name)
+        if value:
+            setattr(args, dest, value)
+            if not quiet:
+                # Never log the value. Credentials end up in CI logs, pasted
+                # terminal output and bug reports.
+                logger.info("Using %s from the environment for --%s",
+                            env_name, dest.replace("_", "-"))
+
+    if not quiet:
+        for key in unknown_keys():
+            logger.warning("Ignoring unrecognised key in .env: %s", key)
+
+    return args
+
+
+if __name__ == "__main__":
+    # `python3 env_config.py` — report what is configured, without printing
+    # any secret. Useful as a first step when a key "isn't being picked up".
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    where = load_env()
+    print(f".env file:      {where or 'not found (this is fine — env vars still work)'}")
+    for env_name, dest in ENV_KEYS.items():
+        value = env_value(env_name)
+        if value is None:
+            state = "not set"
+        elif "KEY" in env_name or "@" in value:
+            state = f"set ({len(value)} chars, hidden)"
+        else:
+            state = f"set ({value})"
+        print(f"  {env_name:<24} -> --{dest.replace('_', '-'):<16} {state}")
+    extras = unknown_keys()
+    if extras:
+        print("\nUnrecognised keys in .env (typo?): " + ", ".join(extras))

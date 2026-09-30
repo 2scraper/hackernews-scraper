@@ -1,0 +1,213 @@
+name: tests
+
+# Runs the offline suite only. Nothing here touches news.ycombinator.com, 2captcha.com
+# or any credential — GitHub Actions has no key, and a CI job that hits a live
+# site fails for reasons that have nothing to do with the commit.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.9 is the floor the README claims. Claiming it without testing it is
+        # how a walrus operator or a `X | None` annotation ships and breaks it.
+        python-version: ["3.9", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install core dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Byte-compile everything
+        # Catches a syntax error on the oldest supported Python before the
+        # suite gets a chance to skip the file.
+        run: python -m compileall -q .
+
+      - name: Offline test suite
+        # Prints its own count. No network, no key, ~1s.
+        run: python smoke_test.py
+
+      - name: Offline test suite, via pytest
+        # tests/test_smoke.py wraps the same run above for the pytest entry
+        # point pyproject.toml declares — this step exists so THAT wrapper
+        # can't silently rot even though the line above already covers the
+        # actual checks.
+        run: |
+          pip install pytest
+          pytest -q
+
+      - name: Every CLI answers --help
+        # A crash in argparse setup or a bad local import is invisible to the
+        # test suite but breaks the first thing any user types. The engine
+        # libraries are deliberately NOT installed here, so an ImportError
+        # naming one of them is expected; anything else is a failure.
+        run: python3 .github/ci_checks.py --help-check
+
+      - name: Committed sample output is real
+        # One implementation, in ci_checks.py, and not an inline copy. A
+        # sibling's workflow carried an inline heredoc that imported its row
+        # class by name, which passes on every machine that never runs the
+        # workflow and failed on the first push. ci_checks.py checks each of
+        # the three per-mode samples against the row class of the mode its
+        # file name registers, and smoke_test.py asserts no workflow imports
+        # a local module inline.
+        run: python3 .github/ci_checks.py --sample-check
+
+      - name: Config reporter runs with no .env present
+        run: python env_config.py
+
+      - name: No credentials committed
+        # A key pasted into a file during debugging is the one mistake in this
+        # repo that cannot be undone by a later commit.
+        #
+        # RUNS .github/ci_checks.py RATHER THAN AN INLINE GREP, and that is a
+        # fix rather than a tidy-up. There were TWO implementations of this
+        # check: this step's grep and ci_checks.py's `--secret-check`. No
+        # workflow invoked the second one, so it was dead code that looked
+        # load-bearing — and it had drifted, in both directions at once:
+        #
+        #   * it FAILED on this repo, on six lines that are documented
+        #     placeholders, so anyone who wired it up would have found it red;
+        #   * and it was STRICTER where it mattered — its pattern covers
+        #     `http://` and `https://` credentialled URLs while the grep here
+        #     covered only `ws://` and `wss://`. A committed proxy URL, which
+        #     is http, would have sailed past this step.
+        #
+        # One implementation, and the one that catches more. Verified in both
+        # directions: it passes on the repo and it flags a planted CDP
+        # endpoint, a planted 32-hex key and a planted http proxy URL.
+        run: python3 .github/ci_checks.py --secret-check
+
+  engine-smoke:
+    # The offline job above installs NO engine library on purpose (that is what
+    # makes it offline), so every engine-guarded check in smoke_test.py skips
+    # in it — and "skipped, engine absent" reads exactly like a passing run.
+    # This job makes those checks actually execute.
+    #
+    # ONE VENV PER ENGINE, and not `pip install playwright pyppeteer selenium`
+    # into one environment, which is what this started as. Two reasons, and the
+    # second is why it matters:
+    #
+    #   * The three engines' pins are mutually unsatisfiable (playwright wants
+    #     pyee>=13, pyppeteer wants pyee<12; pyppeteer wants urllib3<2,
+    #     selenium wants >=2.6), which is exactly what the README tells users,
+    #     so a venv each is also what a user actually does.
+    #   * Installed together and UNPINNED, pip resolved the conflict by
+    #     reaching for pyppeteer 0.0.25 — a stub release nobody uses — instead
+    #     of the >=1.0.2 requirements-puppeteer.txt asks for. CI was green
+    #     against a version the repo does not support. Installing from the
+    #     requirements files, separately, tests the versions users get.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [playwright, puppeteer, selenium]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install core + the ${{ matrix.engine }} engine, in its own venv
+        # No browser binaries: the offline suite imports these libraries and
+        # never launches one.
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/pip install -r requirements.txt \
+                                -r requirements-${{ matrix.engine }}.txt
+          echo "--- what actually got installed ---"
+          .venv/bin/pip list --format=freeze | grep -iE '^(playwright|pyppeteer|selenium|pyee|urllib3|beautifulsoup4)='
+
+      - name: The requirements file is self-consistent
+        # Passes here precisely BECAUSE each engine has its own venv. Run in a
+        # shared one it would report the three-way conflict above, which is the
+        # thing this layout exists to avoid.
+        run: .venv/bin/pip check
+
+      - name: Offline suite, with ${{ matrix.engine }} actually importable
+        # The engine this job installed must IMPORT. Checked directly, and
+        # not by grepping the suite's log: the family's copy grepped for a
+        # phrase its suites never printed, so it could not fail (measured
+        # 2026-09-24: 2 of 31 logs carried it), and a grep for this suite's
+        # current wording would break the day that wording changes. Every
+        # engine imports its driver at module level (smoke_test.py asserts
+        # it), so a broken import fails here by name.
+        run: |
+          set -o pipefail
+          .venv/bin/python smoke_test.py | tee smoke.log
+          if ! .venv/bin/python -c "import ${{ matrix.engine }}_scraper"; then
+            echo "FAILED: ${{ matrix.engine }}_scraper failed to import even though"
+            echo "        ${{ matrix.engine }} is installed in this job."
+            exit 1
+          fi
+
+      - name: The ${{ matrix.engine }} CLI answers --help
+        run: .venv/bin/python ${{ matrix.engine }}_scraper.py --help >/dev/null
+
+  # The Dockerfile ships a runnable image and NOTHING was building it, which
+  # is how it came to be broken: `proxy_pool.py` was left out of the COPY
+  # list while the entrypoint imports it at module level, so the container
+  # died with ModuleNotFoundError on every invocation — `--help` included.
+  #
+  # smoke_test.py now checks the COPY list against the entrypoint's import
+  # graph without needing Docker, and that catches a missing module. It
+  # cannot catch the one step only a real build proves: `playwright install
+  # --with-deps chromium` pulling Chromium's shared libraries into
+  # python:3.12-slim. That is what this job is for.
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the image
+        # Plain `docker build`, no registry and no push: the point is that the
+        # Dockerfile still builds, not that anything is published.
+        run: docker build -t hackernews-scraper:ci .
+
+      - name: The entrypoint runs inside the image
+        # Its CMD is --help, so a bare `run` exercises the default path. This
+        # is the invocation the broken image failed on.
+        run: docker run --rm hackernews-scraper:ci
+
+      - name: Chromium is actually installed in the image
+        # `playwright install` is the step this job exists to prove, so check
+        # the browser is there rather than trusting that the layer succeeded.
+        run: |
+          docker run --rm --entrypoint python3 hackernews-scraper:ci -c "
+          from playwright.sync_api import sync_playwright
+          with sync_playwright() as p:
+              b = p.chromium.launch()
+              print('chromium', b.version)
+              b.close()"
+
+      - name: The image carries no credentials and no test material
+        # It COPYs an explicit list precisely so that it does not. Verify
+        # rather than assume: a `.env` baked into an image is a credential
+        # published to everyone who can pull it.
+        run: |
+          set -e
+          missing=0
+          for f in .env smoke_test.py make_fixtures.py fixtures_generated.json tests sample_output.json; do
+            if docker run --rm --entrypoint sh hackernews-scraper:ci -c "test -e /app/$f"; then
+              echo "::error::$f is inside the image and should not be"
+              missing=1
+            fi
+          done
+          test "$missing" = "0"
+          echo "no .env, no test suite, no fixtures in the image"

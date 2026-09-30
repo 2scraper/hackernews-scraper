@@ -1,0 +1,89 @@
+name: Claude Code
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  issues:
+    types: [opened, assigned]
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  claude:
+    if: |
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+    # Skipped, not failed, when the token is absent. This repo inherited both
+    # Claude workflows from its sibling, where CLAUDE_CODE_OAUTH_TOKEN is set
+    # as a repo secret; here it is not, and the action's own environment
+    # validation fails the job ("Environment variable validation failed"),
+    # which put a permanently red check on every pull request. A check that is
+    # always red teaches everyone to ignore checks. Set the secret to turn
+    # this on:
+    #     gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo 2scraper/hackernews-scraper
+    # `secrets` is not available in a job-level `if`, so the presence test goes
+    # through env and is read by the step.
+    env:
+      HAS_CLAUDE_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      id-token: write
+      actions: read # Required for Claude to read CI results on PRs
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # Installed here, from the STABLE channel, instead of letting the action
+      # fetch `latest` for itself — the same fix its twin
+      # (claude-code-review.yml) already carries, and for the same reason. On
+      # 2026-09-08 `latest` left no binary where the action looks and every
+      # run died with:
+      #     Claude Code native binary not found at /home/runner/.local/bin/claude
+      #
+      # This file did NOT have the fix while its twin did, which is the shape
+      # of drift that makes one of a pair of workflows red for a reason
+      # nobody can see in the other.
+      #
+      # Remove both this step and path_to_claude_code_executable once `latest`
+      # installs correctly again.
+      - name: Install Claude Code (stable channel)
+        if: env.HAS_CLAUDE_TOKEN == 'true'
+        run: |
+          curl -fsSL https://claude.ai/install.sh | bash -s stable
+          "$HOME/.local/bin/claude" --version
+          # Through GITHUB_ENV, not `${{ env.HOME }}`: HOME is a runner
+          # variable and is not in the workflow `env` context, so the
+          # expression form expands to an empty string and the action falls
+          # back to installing `latest` — the very thing this step exists to
+          # avoid, and silently.
+          echo "CLAUDE_BIN=$HOME/.local/bin/claude" >> "$GITHUB_ENV"
+
+      - name: Run Claude Code
+        id: claude
+        if: env.HAS_CLAUDE_TOKEN == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          path_to_claude_code_executable: ${{ env.CLAUDE_BIN }}
+
+          # This is an optional setting that allows Claude to read CI results on PRs
+          additional_permissions: |
+            actions: read
+
+          # Optional: Give a custom prompt to Claude. If this is not specified, Claude will perform the instructions specified in the comment that tagged it.
+          # prompt: 'Update the pull request description to include a summary of changes.'
+
+          # Optional: Add claude_args to customize behavior and configuration
+          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
+          # or https://code.claude.com/docs/en/cli-reference for available options
+          # claude_args: '--allowed-tools Bash(gh pr *)'
+

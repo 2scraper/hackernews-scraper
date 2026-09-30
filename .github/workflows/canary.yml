@@ -1,0 +1,169 @@
+# One real run of each mode against news.ycombinator.com, daily. tests.yml
+# (deliberately) never touches the site.
+#
+# No secrets are needed, and that is the point of running it: the README's
+# central claim is "no key, no proxy, no account", and an ungated scheduled
+# canary is that sentence under test every morning (CLAUDE.md §21, §24). Every
+# page kind answered a datacentre address normally when this repo was written
+# (2026-09-30); a GitHub runner is a datacentre address too. So this is NOT
+# gated on a secret: a canary that CAN pass without a credential must not be
+# skipped for lack of one.
+#
+# It runs at the site's own pace. robots.txt asks for `Crawl-delay: 30` and
+# the engine's `--delay` defaults to it, so the two listing jobs spend about
+# a minute between their three pages, which costs nothing here and is the
+# right way to treat a site that asked.
+#
+# If a later run is refused for its address, the proxy secret goes through the
+# ENVIRONMENT, not a --proxy line: env_config.py reads exactly that variable,
+# an unset secret arrives as an empty string which the loader treats as
+# unset, and the credential never reaches a command line.
+#
+#     gh secret set HACKERNEWS_PROXY --repo 2scraper/hackernews-scraper
+
+name: canary
+
+on:
+  schedule:
+    # 05:40 UTC. Not on the hour: every scheduled workflow fires at :00.
+    - cron: "40 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ?p=N list: pages are independent, and the front page always has
+          # 30 rows a page. The floor leaves room for one unreadable row.
+          - name: front-page
+            mode: listing
+            args: "--feed news"
+            pages: 3
+            floor: 85
+          # A CURSOR list (`?next=ID&n=31`): page 2's address exists only in
+          # page 1's own More link, so this is the job that exercises the
+          # link-to-link walk.
+          - name: newest
+            mode: listing
+            args: "--feed newest"
+            pages: 3
+            floor: 85
+          # An old, closed thread: 71 comments on 2026-09-30, and it is not
+          # going to grow. `--pages` is ignored for an item; one request.
+          - name: item
+            mode: item
+            args: "--mode item --item 8863"
+            pages: 1
+            floor: 60
+          - name: user
+            mode: user
+            args: "--mode user --user pg"
+            pages: 1
+            floor: 1
+    env:
+      HACKERNEWS_PROXY: ${{ secrets.HACKERNEWS_PROXY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-playwright.txt
+          playwright install --with-deps chromium
+
+      # >= 3 pages on the listings, because with one page pagination is never
+      # exercised (§11).
+      - name: Run
+        id: run
+        run: |
+          set +e   # `run:` is `bash -e`; without this a non-zero exit aborts
+                   # the step before the echo below records it.
+          python playwright_scraper.py ${{ matrix.args }} --pages ${{ matrix.pages }} \
+            --out canary --format both --dump-html canary_dump.html
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Interpret
+        run: |
+          code="${{ steps.run.outputs.exit_code }}"
+          echo "exit code: $code"
+          case "$code" in
+            0) ;;
+            3) echo "::error::Blocked (HTTP 403). HN has never refused an address this repo used, so this is a new state: the runner's address was refused. Set the HACKERNEWS_PROXY secret (see the header)."; exit 1 ;;
+            4) echo "::error::Zero rows from a page that is never empty. Either the markup has moved (see canary_dump.html*) or the site answered with its own 'nothing there' sentence."; exit 1 ;;
+            5) echo "::error::The page never arrived. This job uses no credential, so this is not an expired key: a timeout or a throttle that did not lift. Check the log."; exit 1 ;;
+            6) echo "::error::Partial run: a page failed after others succeeded. The sidecar names it."; exit 1 ;;
+            *) echo "::error::Unexpected exit $code."; exit 1 ;;
+          esac
+
+      - name: Assert
+        run: |
+          python - <<'EOF'
+          import json, sys
+          meta = json.load(open("canary.meta.json"))
+          rows = json.load(open("canary.json"))
+          mode, floor, pages = "${{ matrix.mode }}", ${{ matrix.floor }}, ${{ matrix.pages }}
+          problems = []
+          if meta["status"] != "complete":
+              problems.append("status %r (%s)" % (meta["status"], meta["stop_reason"]))
+          if meta["mode"] != mode:
+              problems.append("sidecar says mode %r" % meta["mode"])
+          if meta["pages_completed"] != pages:
+              problems.append("pages_completed %r, not %d" % (meta["pages_completed"], pages))
+          if len(rows) < floor:
+              problems.append("%d rows, floor %d" % (len(rows), floor))
+          if mode == "listing":
+              pairs = [(r["page"], r["position"]) for r in rows]
+              if len(set(pairs)) != len(pairs):
+                  problems.append("page+position is not unique")
+              if any(not r["title"] or not r["url"] or not r["posted_at"] for r in rows):
+                  problems.append("a story without a title, link or stamp")
+              if any(r["rank"] is None for r in rows):
+                  problems.append("a row without a rank on a ranked list")
+              ranks = [r["rank"] for r in rows]
+              if ranks != sorted(ranks) or len(set(ranks)) != len(ranks):
+                  problems.append("ranks are not strictly increasing across pages")
+              want = "%s" % ("addressable" if "--feed news" in "${{ matrix.args }}" else "cursor")
+              if meta.get("addressable") is not (want == "addressable"):
+                  problems.append("the sidecar says addressable=%r, expected %s"
+                                  % (meta.get("addressable"), want))
+          if mode == "item":
+              if any(r["depth"] is None or not r["parent_id"] for r in rows):
+                  problems.append("a comment without depth or parent")
+              if not any(r["depth"] == 0 for r in rows):
+                  problems.append("no top-level comment")
+              stated = (meta.get("item") or {}).get("comments")
+              ok = sum(1 for r in rows if r["status"] == "ok")
+              if stated is None or stated != ok:
+                  problems.append("the page says %r comments, %d rows are ok" % (stated, ok))
+          if mode == "user":
+              r = rows[0]
+              if r["sku"] != "pg" or not r["karma"] or r["created_at"] != "2006-10-09T18:21:32Z":
+                  problems.append("profile row is not the one measured: %r" % r)
+          if problems:
+              print("canary FAILED: " + "; ".join(problems))
+              sys.exit(1)
+          print("canary OK: %d %s rows, complete" % (len(rows), mode))
+          EOF
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: canary-${{ matrix.name }}
+          path: |
+            canary.json
+            canary.csv
+            canary.meta.json
+            canary_dump.html*
+            canary_page*_debug.html
+          if-no-files-found: ignore

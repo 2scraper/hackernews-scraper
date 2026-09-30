@@ -1,0 +1,20 @@
+source,scraped_at,url,sku,story_id,parent_id,author,posted_at,depth,position,status,text,links
+news.ycombinator.com,2026-09-30T08:43:27.802229+00:00,https://news.ycombinator.com/item?id=49902317,49902317,49901736,49901736,user_gt,2026-09-29T23:34:38Z,0,1,ok,Fixture comment text.,
+news.ycombinator.com,2026-09-30T08:43:27.802489+00:00,https://news.ycombinator.com/item?id=49905100,49905100,49901736,49902317,user_gu,2026-09-30T06:17:39Z,1,2,ok,"First paragraph of a fixture comment.
+
+Second paragraph, after a bare paragraph tag with no closing one.",
+news.ycombinator.com,2026-09-30T08:43:27.802769+00:00,https://news.ycombinator.com/item?id=49905233,49905233,49901736,49905100,user_gv,2026-09-30T06:39:54Z,2,3,ok,"A fixture comment with a link:
+
+https://example.org/a/very/long/pa...",https://example.org/a/very/long/path/that/the/page/would/shorten
+news.ycombinator.com,2026-09-30T08:43:27.803019+00:00,https://news.ycombinator.com/item?id=49905377,49905377,49901736,49905233,user_gw,2026-09-30T06:58:37Z,3,4,ok,It's an entity & a fixture.,
+news.ycombinator.com,2026-09-30T08:43:27.803274+00:00,https://news.ycombinator.com/item?id=49905762,49905762,49901736,49902317,user_gx,2026-09-30T07:49:48Z,1,5,ok,"Code follows:
+
+for x in y:
+    print(x)",
+news.ycombinator.com,2026-09-30T08:43:27.803519+00:00,https://news.ycombinator.com/item?id=49902969,49902969,49901736,49902317,user_gy,2026-09-30T00:48:25Z,1,6,ok,Fixture comment text.,
+news.ycombinator.com,2026-09-30T08:43:27.803779+00:00,https://news.ycombinator.com/item?id=49905220,49905220,49901736,49902317,user_gz,2026-09-30T06:37:06Z,1,7,ok,"First paragraph of a fixture comment.
+
+Second paragraph, after a bare paragraph tag with no closing one.",
+news.ycombinator.com,2026-09-30T08:43:27.804041+00:00,https://news.ycombinator.com/item?id=49904780,49904780,49901736,49902317,user_ha,2026-09-30T05:39:17Z,1,8,ok,"A fixture comment with a link:
+
+https://example.org/a/very/long/pa...",https://example.org/a/very/long/path/that/the/page/would/shorten

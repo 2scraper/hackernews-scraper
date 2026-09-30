@@ -1,0 +1,14 @@
+[
+  {
+    "source": "news.ycombinator.com",
+    "scraped_at": "2026-09-30T08:43:27.811330+00:00",
+    "url": "https://news.ycombinator.com/user?id=user_cx",
+    "sku": "user_cx",
+    "created_at": "2007-08-18T16:35:47Z",
+    "karma": 42810,
+    "about": "\"A fixture about box.\"\n\nA second paragraph with a link.",
+    "about_links": [
+      "https://example.org/me"
+    ]
+  }
+]
