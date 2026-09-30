@@ -2000,7 +2000,7 @@ def check_readme_numbers_are_not_stale():
             {"--secret-check", "--sample-check", "--help-check", "--force", "--old", "--new",
              "--fail-on-change", "--chromedriver", "--chromium-path", "--key", "--cdp-url",
              "--timeout", "--tags", "--country", "--render", "--captures", "--verbose",
-             "--no-sandbox", "--proxy-server"}
+             "--no-sandbox", "--proxy-server", "--help"}
         check("README names only flags that exist: %s" % flag, flag in known)
 
 
