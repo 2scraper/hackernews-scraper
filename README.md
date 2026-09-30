@@ -93,8 +93,10 @@ What the paid products would buy you here, honestly: more addresses than one
 with HTTP 503 and this repo handles that (a separate retry budget, at the same
 exit, never counted as a block), but no request made here drew one; HTTP 403
 is handled as a refusal and was never seen either. The canary
-(`.github/workflows/canary.yml`) has not run yet: the repository had not been
-pushed when this was written.
+(`.github/workflows/canary.yml`) ran once by hand on 2026-09-30 from a
+GitHub-hosted runner with no proxy and no secret, and all four jobs passed
+(front page and `/newest` 90 rows each, a 71-comment thread, a profile). That
+is one run from one address; the badge is the daily evidence.
 
 ## Being polite
 

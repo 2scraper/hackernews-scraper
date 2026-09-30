@@ -91,9 +91,12 @@ three browser engines and the 2Captcha Scraper API over one shared fetch loop.
   came from a `mode` column of the rows, which none of these row classes has, so
   it tracked no columns at all.
 
+- CI, on the pushed branch (2026-09-30): the offline suite on Python 3.9 and
+  3.12, each engine in its own virtualenv, the Docker build, and a manual
+  dispatch of the canary from a GitHub runner (all four jobs passed).
+
 ### Not verified
 
-- **The canary has not run.** The repository had not been pushed.
 - **HTTP 403 and the 503 throttle were never seen**, so those code paths are
   exercised by the fake driver only.
 - **`--fingerprint` was not read back out of the page**, and only the
@@ -103,5 +106,3 @@ three browser engines and the 2Captcha Scraper API over one shared fetch loop.
   through a remote profile is refused by design and was not run.
 - Headless was served on every run; headful was tried once. Neither was found to
   matter, which is one page and not a comparison.
-- Python 3.9, the floor this claims, was not available locally; the CI matrix
-  runs it.
