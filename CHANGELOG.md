@@ -7,6 +7,18 @@ toolkit can: a patch release means **fixes**, not that every flag and
 default is frozen. A default that changes behaviour for an existing user is
 said so at the top of its release notes.
 
+## [Unreleased]
+
+### Fixed
+
+- **`--retries 0` sent no request and reported an unreadable page.** The flag
+  counts attempts and the loop is `while attempt < retries`, so zero attempts
+  fetched nothing and the run exited 5 with an empty debug file, which reads
+  exactly like a browser fault. Found by a third-party audit that ran
+  `--retries 0` and measured exit 5 against a curl that returned 200; the same
+  command without that flag returned 30 rows. It is now refused at parse time
+  with exit 2, like `--pages 0`.
+
 ## [0.1.0] — 2026-09-30
 
 First release. Three modes over news.ycombinator.com's server-rendered pages,

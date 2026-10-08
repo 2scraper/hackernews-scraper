@@ -379,7 +379,8 @@ def check_query_validation_and_flag_combinations():
 
     def build(**kw):
         args = types.SimpleNamespace(url=None, mode=None, feed=None, day=None, by=None,
-                                     site=None, item=None, user=None, pages=1)
+                                     site=None, item=None, user=None, pages=1,
+                                     retries=3)
         for k, v in kw.items():
             setattr(args, k, v)
 
@@ -419,6 +420,8 @@ def check_query_validation_and_flag_combinations():
         ("--item on a listing", dict(mode="listing", item="1"), "does not apply"),
         ("--feed on an item run", dict(mode="item", item="1", feed="news"), "does not apply"),
         ("--pages 0", dict(pages=0), "at least 1"),
+        ("--retries 0 (zero attempts sends nothing; found by an audit)",
+         dict(retries=0), "--retries must be at least 1"),
         ("--url together with a query flag", dict(url=H + "news", feed="show"),
          "already carries the query"),
         ("--mode disagreeing with --url", dict(url=H + "item?id=1", mode="listing"),

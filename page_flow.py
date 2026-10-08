@@ -185,6 +185,13 @@ def build_query(args, error: Callable[[str], None]) -> Query:
     """
     if args.pages < 1:
         error("--pages must be at least 1")
+    # `--retries` is ATTEMPTS per page, and the loop is `while attempt <
+    # retries`, so 0 means the page is never requested: the run reports an
+    # unreadable page (exit 5) without having sent anything, which is what
+    # a third-party audit measured on 2026-10-08 and read as a browser fault.
+    if getattr(args, "retries", 1) < 1:
+        error("--retries must be at least 1: it counts attempts, and 0 "
+              "attempts sends no request at all")
     if args.url:
         query, why = query_from_url(args.url)
         if query is None:
