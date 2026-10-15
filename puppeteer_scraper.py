@@ -51,8 +51,7 @@ from typing import Optional
 # At module level, deliberately, and not inside the launch path. The offline
 # suite guards `import puppeteer_scraper` behind try/except ImportError and
 # REPORTS the skip, and CI's engine-smoke job fails on any reported skip.
-# That only works if importing this module actually requires the driver
-# (CLAUDE.md §10).
+# That only works if importing this module actually requires the driver.
 from pyppeteer import launch, connect
 
 from product_parser import FEEDS, MODES
@@ -67,11 +66,11 @@ logger = logging.getLogger("puppeteer_scraper")
 
 # Every await in this file goes through the bridge below with a timeout, so a
 # hung remote call ends the operation instead of the run. pyppeteer provides
-# no connect timeout of its own (§8).
+# no connect timeout of its own.
 DEFAULT_OP_TIMEOUT = 120
 CONNECT_TIMEOUT = 30
 
-# Chromium's own names for a proxy that could not be used (§8).
+# Chromium's own names for a proxy that could not be used.
 _PROXY_ERROR_MARKERS = (
     "ERR_PROXY_CONNECTION_FAILED",
     "ERR_TUNNEL_CONNECTION_FAILED",
@@ -151,7 +150,7 @@ class _AsyncBridge:
         self._thread.join(timeout=5)
 
 
-# Every `scheme://user:pass@` in a string, however many times it occurs (§8).
+# Every `scheme://user:pass@` in a string, however many times it occurs.
 _CREDENTIALS_IN_URL_RE = re.compile(r"([a-z][a-z0-9+.\-]*://)[^\s/@]+:[^\s/@]+@",
                                     re.IGNORECASE)
 
@@ -218,7 +217,7 @@ class _Ops:
     """One pyppeteer browser + page, exposed as page_flow's named operations.
 
     Same contract as playwright_scraper._Ops, including the rule that a
-    rotation means a genuinely FRESH browser (§8).
+    rotation means a genuinely FRESH browser.
     """
 
     def __init__(self, bridge: _AsyncBridge, args, pool):
@@ -276,7 +275,7 @@ class _Ops:
             exit_url = self.pool.current
             # Credentials are answered over CDP, never put on the command
             # line: --proxy-server= is part of the browser's argv, readable by
-            # anything that can run `ps` (§8).
+            # anything that can run `ps`.
             scrubbed, credentials = split_credentials(exit_url)
             launch_args.append(f"--proxy-server={scrubbed}")
             logger.info("Using proxy exit %s", mask(exit_url))
@@ -291,7 +290,7 @@ class _Ops:
         self.page = self.bridge.run(self.browser.newPage())
         # No user agent is set, as in the Playwright twin: the browser's own is
         # the one whose TLS handshake and client hints agree with it, and a
-        # bare CDP override leaves those reporting the real browser (§24).
+        # bare CDP override leaves those reporting the real browser.
         # --fingerprint is the exception, and it brings a whole identity.
         if self.args.fingerprint:
             self._apply_fingerprint()
@@ -304,7 +303,7 @@ class _Ops:
         """The SAME init script the other two engines install, so no engine
         applies a different half of one fingerprint. The user agent is set
         only together with that script, which reads the client hints and
-        platform out of the same fingerprint (§24)."""
+        platform out of the same fingerprint."""
         from fingerprint_client import (get_fingerprint, fingerprint_user_agent,
                                         playwright_init_script)
         fp = get_fingerprint(self.args.twocaptcha_key, tags=self.args.fp_tags,
@@ -329,7 +328,7 @@ class _Ops:
         The RENDERED document, not the raw bytes: what the parser sees is what
         a browser built, which is also what `--dump-html` writes. No
         JavaScript is evaluated in the page, so a site's CSP cannot get in the
-        way (§18); `domcontentloaded` is enough here because the data is in
+        way; `domcontentloaded` is enough here because the data is in
         the markup.
         """
         nav_s = page_flow.NAV_TIMEOUT_MS / 1000.0
@@ -565,6 +564,9 @@ def parse_args(argv=None):
     p.add_argument("--headless", action="store_true", default=True)
     p.add_argument("--headful", dest="headless", action="store_false")
     args = p.parse_args(argv)
+    # Whether --url was TYPED, read before .env fills it: a URL from the
+    # environment is a default, and must not refuse the query flags.
+    args.typed_url = args.url
     env_config.apply(args)
     args.query = page_flow.build_query(args, p.error)
     args.mode = args.query.mode

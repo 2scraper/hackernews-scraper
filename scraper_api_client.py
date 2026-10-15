@@ -85,8 +85,12 @@ _CREDS_IN_TEXT_RE = re.compile(r"([a-z][a-z0-9+.-]*://)[^/\s'\"@]+@", re.IGNOREC
 # Same shape as captcha_solver's and fingerprint_client's. A third copy is
 # one too many and they should be unified in a family pass; reaching into
 # another module's private name to avoid it would be worse.
+# `key=value` in a URL, and `clientKey: value` / `"key": "value"` in a
+# header or a JSON body: the separator and any quotes are kept, the value is
+# masked.
 _KEY_IN_TEXT_RE = re.compile(
-    r"((?:client)?key|token|api[_-]?key)=([^&\s'\"]{6,})", re.IGNORECASE)
+    r"((?:client)?key|token|api[_-]?key)(\"?\s*[:=]\s*\"?)([^&\s'\",}]{6,})",
+    re.IGNORECASE)
 
 
 def _redact_debug_header(value: str) -> str:
@@ -103,7 +107,7 @@ def _redact_debug_header(value: str) -> str:
     would silently drop the cost and timing figures this is logged FOR the
     first time the API adds a field.
     """
-    return _KEY_IN_TEXT_RE.sub(r"\1=***",
+    return _KEY_IN_TEXT_RE.sub(r"\1\2***",
                                _CREDS_IN_TEXT_RE.sub(r"\1***:***@", value))
 
 
@@ -268,6 +272,8 @@ def parse_args(argv=None):
                    help="Also write the page the parser sees to this path, "
                         "even on success")
     args = p.parse_args(argv)
+    # Whether --url was TYPED, read before .env fills it (see build_query).
+    args.typed_url = args.url
     # This client uses --key and --cdp-url rather than --twocaptcha-key and
     # --cdp-endpoint, so the env mapping is spelled out instead of defaulted.
     env_config.apply(args, keys={

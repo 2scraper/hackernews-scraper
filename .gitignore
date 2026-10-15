@@ -23,7 +23,7 @@ hackernews_rows_*.*
 live_results/
 live_results.zip
 # ANY working directory a live run writes into, by KIND rather than by the one
-# name an older repo used (CLAUDE.md §24). Measured here: `live/` was not
+# name an older repo used. Measured here: `live/` was not
 # listed, and a `--dump-html` of a 3-page run wrote `canary_dump.json.page3`,
 # which `*.json` does not cover. It sat untracked and NOT ignored, one
 # `git add -A` from a commit, until the credential scan flagged the 32-hex
@@ -101,7 +101,7 @@ secrets*
 # recoverable only because that repo was private at the time. On 2026-09-17
 # a sibling had an untracked `.env.bak` holding a 32-hex key in a PUBLIC
 # repository, one `git add -A` from publication. Craigslist was fixed then
-# and the fix never reached anyone else, which is §16's rule unapplied: when
-# you fix one, check the siblings.
+# and the fix never reached anyone else, which is the lesson: when you fix one,
+# check the siblings.
 .env*
 !.env.example

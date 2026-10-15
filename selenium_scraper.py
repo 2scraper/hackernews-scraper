@@ -76,10 +76,10 @@ import env_config
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("selenium_scraper")
 
-# Explicit, because a driver that stops answering otherwise hangs the run (§8).
+# Explicit, because a driver that stops answering otherwise hangs the run.
 PAGE_LOAD_TIMEOUT = page_flow.NAV_TIMEOUT_MS / 1000.0
 
-# Chromium's own names for "the proxy is the problem, not the site" (§8).
+# Chromium's own names for "the proxy is the problem, not the site".
 _PROXY_ERROR_MARKERS = (
     "ERR_PROXY_CONNECTION_FAILED", "ERR_TUNNEL_CONNECTION_FAILED",
     "ERR_PROXY_AUTH_UNSUPPORTED", "ERR_PROXY_AUTH_REQUESTED",
@@ -89,7 +89,7 @@ _PROXY_ERROR_MARKERS = (
 )
 
 
-# Every `scheme://user:pass@` in a string, however many times it occurs (§8).
+# Every `scheme://user:pass@` in a string, however many times it occurs.
 _CREDENTIALS_IN_URL_RE = re.compile(r"([a-z][a-z0-9+.\-]*://)[^\s/@]+:[^\s/@]+@",
                                     re.IGNORECASE)
 
@@ -129,7 +129,7 @@ class _Ops:
     """One Chrome driver, exposed as page_flow's named operations.
 
     Same contract as playwright_scraper._Ops, including the rule that a
-    rotation means a genuinely FRESH browser (§8).
+    rotation means a genuinely FRESH browser.
     """
 
     def __init__(self, args, pool):
@@ -151,7 +151,7 @@ class _Ops:
             logger.info("Attaching to an existing browser at %s.",
                         options.debugger_address)
             # No UA, no proxy, no fingerprint on this path: the remote browser
-            # brings its own (§8).
+            # brings its own.
             self.driver = webdriver.Chrome(options=options, service=self._service())
             self.driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)
             return self
@@ -177,7 +177,7 @@ class _Ops:
         self.driver = webdriver.Chrome(options=options, service=self._service())
         self.driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)
         # No user agent is set, as in the twin: a bare override leaves the
-        # client hints reporting the real browser (§24). Only --fingerprint,
+        # client hints reporting the real browser. Only --fingerprint,
         # which supplies a whole identity, overrides anything.
         if self.args.fingerprint:
             self._apply_fingerprint()
@@ -430,6 +430,9 @@ def parse_args(argv=None):
     p.add_argument("--headless", action="store_true", default=True)
     p.add_argument("--headful", dest="headless", action="store_false")
     args = p.parse_args(argv)
+    # Whether --url was TYPED, read before .env fills it: a URL from the
+    # environment is a default, and must not refuse the query flags.
+    args.typed_url = args.url
     env_config.apply(args)
     args.query = page_flow.build_query(args, p.error)
     args.mode = args.query.mode

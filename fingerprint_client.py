@@ -88,12 +88,16 @@ logger = logging.getLogger("fingerprint_client")
 # Everything raised or logged from this module goes through here first. The
 # endpoint and the status survive, because which call failed is the useful
 # half and is not the secret.
+# `key=value` in a URL, and `clientKey: value` / `"key": "value"` in a
+# header or a JSON body: the separator and any quotes are kept, the value is
+# masked.
 _KEY_IN_TEXT_RE = re.compile(
-    r"((?:client)?key|token|api[_-]?key)=([^&\s'\"]{6,})", re.IGNORECASE)
+    r"((?:client)?key|token|api[_-]?key)(\"?\s*[:=]\s*\"?)([^&\s'\",}]{6,})",
+    re.IGNORECASE)
 
 
 def _redact(text) -> str:
-    return _KEY_IN_TEXT_RE.sub(r"\1=***", str(text))
+    return _KEY_IN_TEXT_RE.sub(r"\1\2***", str(text))
 
 API_BASE = "https://api.2captcha.com"
 RANDOM_URL = f"{API_BASE}/fingerprint/random"
@@ -247,8 +251,8 @@ def playwright_context_kwargs(fp: dict) -> dict:
     # option and which was previously dropped on the floor. Measured
     # 2026-09-11: a fingerprint stating `deviceScaleFactor: 1.25` produced a
     # browser reporting `window.devicePixelRatio === 1`, so the identity
-    # contradicted itself on an axis any fingerprinter reads for free. Same
-    # shape as the three defects §16 lists -- a key the API returns that
+    # contradicted itself on an axis any fingerprinter reads for free. A
+    # familiar shape -- a key the API returns that
     # nothing applies -- and found the same way, by comparing the live
     # browser against the fingerprint rather than by reading the code.
     scale = (fp.get("screen") or {}).get("deviceScaleFactor")
@@ -350,7 +354,7 @@ def main() -> int:
     # loader. It used to read `os.environ` alone, which meant a key put in
     # `.env` exactly as README and .env.example instruct worked for every
     # engine and failed here with "No API key" — a documented mechanism not
-    # applied on one path, which is the shape of half the defects §16 lists.
+    # applied on one path, a familiar shape of defect.
     # `.env` has to be LOADED before it can be read: `env_value` looks at
     # os.environ, which `load_env` is what fills from the file. Calling it
     # here rather than relying on an engine having called it is the whole

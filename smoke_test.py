@@ -164,7 +164,7 @@ def check_no_challenge_vocabulary_on_any_served_page():
 
 
 # ---------------------------------------------------------------------------
-# The parser, asserted on VALUES rather than on coverage (§10)
+# The parser, asserted on VALUES rather than on coverage
 # ---------------------------------------------------------------------------
 
 def check_front_page_parses_to_the_captured_values():
@@ -204,7 +204,7 @@ def check_rank_continues_across_pages_and_page_position_is_unique():
           (p2[0].rank, p2[-1].rank), (31, 60))
     equal("position restarts at 1 on every page", (p1[0].position, p2[0].position), (1, 1))
     keys = [(r.page, r.position) for r in p1 + p2]
-    equal("page + position is unique across a two-page run (§18)", len(set(keys)), 60)
+    equal("page + position is unique across a two-page run", len(set(keys)), 60)
     equal("no story id repeats across the two pages",
           len({r.sku for r in p1 + p2}), 60)
 
@@ -343,7 +343,7 @@ def check_url_shapes():
 
 def check_urls_the_site_would_answer_with_the_wrong_thing_are_refused():
     """Measured 2026-09-30: `front?day=garbage` served the latest day,
-    `news?p=abc` and `news?p=0` served page 1, all HTTP 200 (§26)."""
+    `news?p=abc` and `news?p=0` served page 1, all HTTP 200."""
     import product_parser as P
     refused = {
         H + "front?day=garbage": "YYYY-MM-DD",
@@ -473,8 +473,11 @@ def check_page_states_on_real_captures():
 
 
 def check_a_served_page_that_parses_to_no_rows_is_called_out_as_our_bug():
-    """§20: a page the site served, with rows on it, that parses to none is
-    THIS repo's bug and must not read as 'the listing was empty'."""
+    """A page the site served, with rows on it, that parses to none is THIS
+    repo's bug and must not read as 'the listing was empty'. It used to exit
+    4 here, which told a pipeline the site had nothing; it is now a failed
+    page (`parser_found_nothing`): exit 5 with nothing gathered, exit 6 when
+    earlier pages had rows."""
     import page_flow
     broken = ('<html><body><table id="hnmain"><tr class="athing submission" id="1">'
               '<td>markup that moved</td></tr></table></body></html>')
@@ -493,8 +496,45 @@ def check_a_served_page_that_parses_to_no_rows_is_called_out_as_our_bug():
     finally:
         logging.getLogger("page_flow").removeHandler(handler)
     check("the run says the markup has probably changed",
-          any("parsed to none" in r for r in records), repr(records))
-    equal("...and exits 4 (the catalogue question was answered: nothing readable)", rc, 4)
+          any("parsed to no rows" in r for r in records), repr(records))
+    equal("...and exits 5: nothing was read, so nothing can be concluded", rc, 5)
+
+
+def check_markup_drift_is_a_parser_failure_not_the_end_of_the_list():
+    """Renaming the row class on page 2 left the page's own More link in
+    place; it used to read as the end of the list, a COMPLETE run of half
+    the data with exit 0."""
+    drifted = fx("news2").replace("athing", "athing-v2")
+    assert drifted != fx("news2")
+    rc, meta, rows, ops = _run(_FakeOps({H + "news": [(200, fx("news"))],
+                                         H + "news?p=2": [(200, drifted)]}), pages=3)
+    equal("page 2 drifted: exit 6, partial, parser_found_nothing",
+          (rc, meta["status"], meta["stop_reason"], meta["pages_failed"]),
+          (6, "partial", "parser_found_nothing", [2]))
+    equal("...page 1's 30 rows kept", len(rows), 30)
+    rc, meta, rows, ops = _run(_FakeOps({H + "news": [(200, fx("news").replace("athing", "athing-v2"))]}),
+                               pages=1)
+    equal("the same drift on page 1: exit 5, not 4", (rc, rows), (5, None))
+    renamed = fx("news").replace("titleline", "titleline-v2")
+    assert renamed != fx("news")
+    rc, meta, rows, ops = _run(_FakeOps({H + "news": [(200, renamed)]}), pages=1)
+    equal("rows present but the title anchor renamed: exit 5", (rc, rows), (5, None))
+    from product_parser import Query
+    q = Query("item", item_id="49901736")
+    thread = fx("item_top").replace("comtr", "comtr-v2")
+    assert thread != fx("item_top")
+    rc, meta, rows, ops = _run(_FakeOps({H + "item?id=49901736": [(200, thread)]}),
+                               query=q)
+    equal("a thread stating 231 comments that parses to none: exit 5", (rc, rows), (5, None))
+    prof = fx("user").replace(">user:<", ">username:<")
+    assert prof != fx("user")
+    rc, meta, rows, ops = _run(_FakeOps({H + "user?id=dang": [(200, prof)]}),
+                               query=Query("user", username="dang"))
+    equal("a profile page whose labels moved: exit 5", (rc, rows), (5, None))
+    rc, meta, rows, ops = _run(_FakeOps({H + "news": [(200, fx("news"))],
+                                         H + "news?p=2": [(200, fx("p50"))]}), pages=3)
+    equal("a REAL page past the end (no rows, no More link) still ends the list",
+          (rc, meta["status"], meta["stop_reason"]), (0, "complete", "end_of_listing"))
 
 
 # ---------------------------------------------------------------------------
@@ -677,7 +717,7 @@ def check_state_policy():
     check("content and empty are parsed, never retried or blocked",
           all(F.should_parse(s) and not F.should_retry(s) and not F.counts_as_blocked(s)
               for s in ("content", "empty")))
-    check("throttled: retried, NOT blocked (§24)",
+    check("throttled: retried, NOT blocked",
           F.should_retry("throttled") and not F.counts_as_blocked("throttled")
           and not F.should_parse("throttled"))
     check("blocked: retried, blocked, never parsed",
@@ -699,7 +739,7 @@ def check_state_policy():
 
 
 def check_policy_constants_have_a_consumer():
-    """§17: a policy constant nothing reads is the same defect as dead code."""
+    """A policy constant nothing reads is the same defect as dead code."""
     src = open(os.path.join(HERE, "page_flow.py"), encoding="utf-8").read()
     engines = "".join(open(os.path.join(HERE, m + ".py"), encoding="utf-8").read()
                       for m in ENGINES + ("scraper_api_client",))
@@ -798,7 +838,7 @@ def check_the_shared_loop_walks_a_p_list_and_ends_on_the_empty_page():
     equal("a `products` count for the family", meta["products"], 60)
     equal("mode and source", (meta["mode"], meta["source"]), ("listing", "news.ycombinator.com"))
     keys = {(r["page"], r["position"]) for r in rows}
-    equal("page + position unique across the run (§18)", len(keys), 60)
+    equal("page + position unique across the run", len(keys), 60)
     ops = _news_ops()
     _run(ops, pages=3, delay=2)
     check("--delay is really waited between pages (2000 ms, twice: before page 2 and page 3)",
@@ -915,7 +955,7 @@ def check_refusals_throttles_and_transport_failures():
     check("...after a wait", any(w >= 1000 for w in ops.waits), repr(ops.waits))
     rc, meta, rows, ops = _run(_FakeOps({H + "news": [(503, ""), (200, fx("news"))]}),
                                pages=1, retries=1)
-    equal("a throttle wait spends its OWN budget, not --retries (§24): with "
+    equal("a throttle wait spends its OWN budget, not --retries: with "
           "--retries 1 the page still arrives", rc, 0)
 
     rc, meta, rows, ops = _run(_FakeOps({H + "news": [(429, "")]}), pages=1)
@@ -948,7 +988,7 @@ def check_a_page_two_failure_is_a_partial_run_with_the_page_named():
 
 
 def check_a_page_that_adds_nothing_new_ends_the_run_on_the_data():
-    """§7: a re-served page ends a list by the DATA, not by a selector."""
+    """A re-served page ends a list by the DATA, not by a selector."""
     ops = _FakeOps({H + "news": [(200, fx("news"))], H + "news?p=2": [(200, fx("news"))]})
     rc, meta, rows, ops = _run(ops, pages=4)
     equal("page 2 = page 1 again: exit 0, complete", (rc, meta["status"]), (0, "complete"))
@@ -1033,7 +1073,7 @@ def check_row_schema():
                                UNIQUE_BY_SKU_MODES)
     for cls in (Story, Comment, User):
         names = [f.name for f in fields(cls)]
-        equal("%s: the first four columns are the family's, in order (§9)" % cls.__name__,
+        equal("%s: the first four columns are the family's, in order" % cls.__name__,
               names[:4], ["source", "scraped_at", "url", "sku"])
     equal("Story also carries `title` in the family position",
           [f.name for f in fields(Story)][4], "title")
@@ -1257,7 +1297,7 @@ def check_sidecar_shape():
 
 
 # ---------------------------------------------------------------------------
-# The engines — the checks CLAUDE.md §17 says to steal
+# The engines — signature, flag and name checks
 # ---------------------------------------------------------------------------
 
 def check_engines_import_their_driver_at_module_level():
@@ -1274,9 +1314,9 @@ def check_engines_import_their_driver_at_module_level():
 
 
 def check_shared_calls_bind_against_the_real_signature():
-    """§17's check #1. Every call from an engine (and the Scraper API client,
+    """Every call from an engine (and the Scraper API client,
     diff_runs and page_flow itself) into a shared module is bound against the
-    callee's real signature. A name that does not exist FAILS (§22). A name
+    callee's real signature. A name that does not exist FAILS. A name
     bound in the calling file shadows a same-named module."""
     import output_writer
     import page_flow
@@ -1338,7 +1378,7 @@ def check_shared_calls_bind_against_the_real_signature():
 
 
 def check_every_name_imported_from_a_local_module_exists():
-    """§22, and the family's `credential-gated paths hide dead calls`: an import
+    """An import
     INSIDE a function is never bound by a run that does not reach it, so a
     `--fingerprint` path can name a helper that does not exist and every
     keyless check stays green. Walk EVERY `from <local> import name`, at any
@@ -1363,7 +1403,7 @@ def check_every_name_imported_from_a_local_module_exists():
 
 
 def check_every_page_flow_call_in_every_engine_names_something_that_exists():
-    """§22: a check that resolves before it tests must say what it does when
+    """A check that resolves before it tests must say what it does when
     the resolution FAILS. Every `page_flow.X` an engine touches must exist."""
     import page_flow
     for module in ENGINES + ("scraper_api_client",):
@@ -1397,8 +1437,8 @@ def _argparse_flags(module_name):
     return flags
 
 
-# The family's flag contract (CLAUDE.md §9, including the five it omitted
-# for months), plus this repo's own query flags.
+# The family's flag contract (including the five flags an older list
+# omitted for months), plus this repo's own query flags.
 CONTRACT_FLAGS = {
     "--url", "--pages", "--category", "--format", "--out", "--delay",
     "--retries", "--retry-delay", "--concurrency", "--proxy", "--proxy-file",
@@ -1409,13 +1449,13 @@ CONTRACT_FLAGS = {
 }
 HN_FLAGS = {"--feed", "--day", "--by", "--site", "--item", "--user"}
 # Flags an engine has and its twins do not, each because of its driver. The
-# exception list IS the documentation (§20): closing one must be a decision.
+# exception list IS the documentation: closing one must be a decision.
 DOCUMENTED_DIFFERENCES = {"puppeteer_scraper": {"--chromium-path"},
                           "selenium_scraper": {"--chromedriver"}}
 
 
 def check_engine_flag_sets():
-    """§17's check #2: against the contract AND against each other, both
+    """against the contract AND against each other, both
     ways."""
     sets = {m: _argparse_flags(m) for m in ENGINES}
     for module, flags in sets.items():
@@ -1478,7 +1518,7 @@ def check_banned_and_removed_flags():
 
 
 def check_undefined_names_in_every_module():
-    """§10: compileall proves a file PARSES, not that its names RESOLVE.
+    """Compileall proves a file PARSES, not that its names RESOLVE.
     Kept COARSE (pooled bindings) so it under-reports rather than invents."""
     import builtins
     for filename in sorted(f for f in os.listdir(HERE) if f.endswith(".py")):
@@ -1577,7 +1617,9 @@ def check_dockerfile_copies_everything_the_entrypoint_imports():
 def check_env_example_documents_exactly_what_the_loader_reads():
     import env_config
     text = open(os.path.join(HERE, ".env.example"), encoding="utf-8").read()
-    documented = set(re.findall(r"^([A-Z][A-Z0-9_]+)=", text, re.M))
+    # A variable is documented live (`NAME=`) or as a commented example
+    # (`# NAME=`): HACKERNEWS_URL ships commented so a copy changes nothing.
+    documented = set(re.findall(r"^(?:# )?([A-Z][A-Z0-9_]+)=", text, re.M))
     read = set(env_config.ENV_KEYS)
     equal("the example and the loader name the same variables",
           sorted(documented), sorted(read))
@@ -1585,6 +1627,44 @@ def check_env_example_documents_exactly_what_the_loader_reads():
           {"HACKERNEWS_CDP_ENDPOINT", "HACKERNEWS_PROXY", "HACKERNEWS_URL"} <= read)
     check("no donor prefix is left behind", not any("BINANCE" in k for k in read)
           and "BINANCE" not in text)
+
+
+def check_an_environment_url_never_refuses_the_query_flags():
+    """`cp .env.example .env` used to set HACKERNEWS_URL, and every typed
+    --feed/--item/--user/--mode was then refused as disagreeing with a URL
+    the user never typed."""
+    import page_flow
+    text = open(os.path.join(HERE, ".env.example"), encoding="utf-8").read()
+    check("a copied .env.example sets no default URL",
+          not re.search(r"^HACKERNEWS_URL=", text, re.M))
+
+    def ns(**kw):
+        base = dict(pages=1, retries=1, url=None, mode=None, feed=None, day=None,
+                    by=None, site=None, item=None, user=None)
+        base.update(kw)
+        return types.SimpleNamespace(**base)
+
+    def refused(args):
+        errors = []
+
+        def error(msg):
+            errors.append(msg)
+            raise SystemExit(2)
+        try:
+            return page_flow.build_query(args, error), None
+        except SystemExit:
+            return None, errors[0]
+    env = H + "news"
+    q, err = refused(ns(url=env, typed_url=None, feed="show"))
+    equal("an environment URL and a typed --feed: the flag wins",
+          (err, q and q.feed), (None, "show"))
+    q, err = refused(ns(url=env, typed_url=None, mode="user", user="dang"))
+    equal("...and a typed --mode user --user", (err, q and q.mode), (None, "user"))
+    q, err = refused(ns(url=env, typed_url=None))
+    equal("an environment URL alone is still the default target",
+          (err, q and q.feed), (None, "news"))
+    q, err = refused(ns(url=env, typed_url=env, feed="show"))
+    check("a TYPED --url with --feed is still refused", err and "--url already" in err, err)
 
 
 def check_a_copied_env_example_reads_as_UNSET():
@@ -1613,7 +1693,7 @@ def check_credential_scan_is_one_implementation_invoked_from_both():
     script = os.path.join(HERE, ".github", "ci_checks.py")
     if not os.path.isdir(os.path.join(HERE, ".github")):
         # Inside the Docker image, which copies no .github at all. Triggered
-        # by the WHOLE directory being absent, never by one file in it (§22).
+        # by the WHOLE directory being absent, never by one file in it.
         skip("ci_checks", "no .github directory (the image)")
         return
     check("the credential scan exists as a script", os.path.exists(script))
@@ -1643,7 +1723,7 @@ def check_no_workflow_imports_the_code_inline():
 
 
 def check_engine_smoke_checks_the_import_not_a_phrase():
-    """§26: a grep for a phrase nobody prints can never fail. The step must
+    """A grep for a phrase nobody prints can never fail. The step must
     import the engine, which fails by name because every engine imports its
     driver at module level."""
     path = os.path.join(HERE, ".github", "workflows", "tests.yml")
@@ -1657,7 +1737,7 @@ def check_engine_smoke_checks_the_import_not_a_phrase():
 
 
 # Assembled from pieces, so this file can be scanned like every other rather
-# than exempted (§22: the file most likely to acquire a stray phrase is the
+# than exempted (the file most likely to acquire a stray phrase is the
 # one a wholesale exemption never reads).
 BANNED_WORDING = (
     "cloud" + " browser", "anti" + "detect browser", "2scraper " + "Anti" + "detect Browser",
@@ -1666,7 +1746,7 @@ BANNED_WORDING = (
 
 
 def check_banned_wording():
-    """§12, enforced by this test rather than by review."""
+    """The banned product wording, enforced by this test rather than by review."""
     scanned = 0
     for root, dirs, files in os.walk(HERE):
         dirs[:] = [d for d in dirs if d not in (".git", "__pycache__", ".pytest_cache",
@@ -1684,6 +1764,39 @@ def check_banned_wording():
                     check("%s contains no banned phrase #%d" % (
                         os.path.relpath(path, HERE), BANNED_WORDING.index(phrase)), False)
     check("the banned-wording scan read the repo (%d files)" % scanned, scanned > 20)
+
+
+# Pointers into private, unpublished instruction files. A reader of this
+# public repo cannot open them, so each rule is stated here in its own words.
+# Assembled from pieces so this file does not match itself.
+PRIVATE_CITATIONS = ("CLAUDE" + ".md", "claude_" + "2scraper", "2scraper_" + "repo_rules",
+                     "play" + "book")
+PRIVATE_SECTION_RE = re.compile("\u00a7" + r"\s?\d")
+
+
+def check_no_citation_of_private_instructions_ships():
+    """Every shipped file, CHANGELOG included, is free of references to the
+    private instruction files and of bare section numbers into them."""
+    scanned, hits = 0, []
+    for root, dirs, files in os.walk(HERE):
+        dirs[:] = [d for d in dirs if d not in (".git", "__pycache__", ".pytest_cache",
+                                                "live", "captures", ".claude", ".venv",
+                                                "venv", "node_modules")
+                   and not os.path.exists(os.path.join(root, d, "pyvenv.cfg"))]
+        for filename in files:
+            path = os.path.join(root, filename)
+            if os.path.relpath(path, HERE) == PRIVATE_CITATIONS[0]:
+                continue  # a local-only instruction file, never committed
+            try:
+                text = open(path, encoding="utf-8").read()
+            except (UnicodeDecodeError, OSError):
+                continue
+            scanned += 1
+            if any(t in text for t in PRIVATE_CITATIONS) or PRIVATE_SECTION_RE.search(text):
+                hits.append(os.path.relpath(path, HERE))
+    check("no shipped file cites the private instruction files or their sections",
+          not hits, "found in %s" % hits)
+    check("the citation scan read the repo (%d files)" % scanned, scanned > 20)
 
 
 def check_no_donor_name_is_left_in_shipped_files():
@@ -1719,7 +1832,7 @@ def check_no_donor_name_is_left_in_shipped_files():
 
 
 def check_concurrency_with_the_browser_stubbed():
-    """§10: a live run cannot always reach this machinery. Driven through the
+    """A live run cannot always reach this machinery. Driven through the
     SHARED worker loop with the fetch replaced."""
     import page_flow
     import queue as queue_mod
@@ -1848,7 +1961,7 @@ def check_fingerprint_kwargs_are_ones_the_driver_accepts():
 
 
 def check_no_engine_overrides_the_user_agent_without_a_fingerprint():
-    """§24: a bare UA override leaves the client hints reporting the real
+    """A bare UA override leaves the client hints reporting the real
     browser, and only a complete identity is safe. Nothing on this site asks
     for one, so no engine sets a user agent of its own outside --fingerprint."""
     for module in ENGINES:
@@ -1859,7 +1972,7 @@ def check_no_engine_overrides_the_user_agent_without_a_fingerprint():
 
 
 def check_engines_do_not_evaluate_a_string_in_the_browser():
-    """§18: wait_for_function evaluates a string, which a CSP without
+    """Wait_for_function evaluates a string, which a CSP without
     unsafe-eval kills. This site reads no page state through JavaScript at
     all, so no engine calls anything that evaluates."""
     for module in ENGINES:
@@ -1964,10 +2077,16 @@ def check_x_debug_header_is_redacted():
           "cost=0.00145" in out and "cb.2captcha.com:9222" in out and "status=200" in out)
     check("x-debug: the log line calls the redactor",
           'logger.info("x-debug: %s", _redact_debug_header(debug))' in inspect.getsource(sac))
+    import fingerprint_client as fpc
+    for shape in ("clientKey: " + key, '{"clientKey":"' + key + '"}',
+                  '"key": "' + key + '"', "apiKey=" + key):
+        check("a key in the shape %r is masked in x-debug and in fingerprint errors"
+              % shape.replace(key, "<key>"),
+              key not in sac._redact_debug_header(shape) and key not in fpc._redact(shape))
 
 
 def check_captcha_capability_claims_match_the_code():
-    """§19: the most expensive bug this family can ship is a SENTENCE. This
+    """The most expensive bug this family can ship is a SENTENCE. This
     repo makes ONE claim about captchas and it is a claim about the repo."""
     readme = open(os.path.join(HERE, "README.md"), encoding="utf-8").read()
     low = readme.lower()
@@ -1983,7 +2102,7 @@ def check_captcha_capability_claims_match_the_code():
 
 
 def check_readme_numbers_are_not_stale():
-    """§17's check #4: a claim in the README is a claim about the code."""
+    """a claim in the README is a claim about the code."""
     readme = open(os.path.join(HERE, "README.md"), encoding="utf-8").read()
     from output_writer import ROW_CLASS_BY_MODE
     sizes = {len(fields(c)) for c in ROW_CLASS_BY_MODE.values()}

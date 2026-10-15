@@ -7,7 +7,7 @@ make_fixtures.py — build fixtures_generated.json from real captures.
 `captures/` holds raw pages fetched from news.ycombinator.com on 2026-09-30
 (plain `curl`, and one browser-serialised copy per page kind, see --render).
 It is NOT committed: a raw page dump carries the session that fetched it and
-strangers' words (CLAUDE.md §10). This script turns each capture into a
+strangers' words. This script turns each capture into a
 smaller, scrubbed fixture and PROVES the trimmed copy parses the way the
 original did, so the suite tests the markup of the real site and not a
 hand-written imitation of it.
@@ -249,7 +249,7 @@ def build(captures, render):
             # Chromium's own network-error page, produced for real: a proxy
             # that refuses the connection. It is NOT the site's page, and
             # nothing in it names a vendor, so only "is it built out of the
-            # site's own markup" tells it from a served page (§18).
+            # site's own markup" tells it from a served page.
             browser = pw.chromium.launch(proxy={"server": "http://127.0.0.1:9"})
             page = browser.new_page()
             try:

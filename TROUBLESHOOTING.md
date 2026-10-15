@@ -24,7 +24,7 @@ report with the sidecar's `stop_reason` is welcome.
 
 ## Exit 4 — zero rows
 
-One of three things, and only the last is a bug:
+One of two things:
 
 * **There is nothing there.** `No such item.`, `No such user.`,
   `We don't have that data yet.` and `HN didn't exist yet.` are plain-text
@@ -34,15 +34,18 @@ One of three things, and only the last is a bug:
   and `?p=27` is empty. A run that starts inside the list and reaches the end
   is `complete`, exit 0; exit 4 is only for a FIRST page that is already empty,
   such as `--url ".../news?p=30"`.
-* **A served page parsed to no rows.** That is a parser bug or a markup
-  change. Re-run with `--dump-html page.html` (it writes the exact bytes the
-  parser saw, on success too) and open a "Site changed" issue.
-
 Nothing is written on exit 4, so an earlier good file is left alone;
 `--allow-empty` writes the empty file.
 
 ## Exit 5 — the content was never obtained
 
+* **A served page parsed to no rows** (`stop_reason: parser_found_nothing`).
+  The page still says it has content (rows in its markup, a More link, a
+  comment count above zero, a profile page) and the parser read none of it:
+  a parser bug or a markup change, not an empty list. The page is saved as
+  `<out>_pageN_debug.html`; re-run with `--dump-html page.html` if you want
+  the bytes on success too, and open a "Site changed" issue. On a later page
+  of a run that already has rows, the same thing is exit 6.
 * **A timeout or a dead proxy.** The log names which. A dead proxy wants a
   different exit; a timeout wants another try at the same one.
 * **A throttle that did not lift.** HN is documented to throttle by address
@@ -50,7 +53,7 @@ Nothing is written on exit 4, so an earlier good file is left alone;
   spaced 4 s apart drew none, one measurement). Raise `--delay`, lower
   `--concurrency`, or spread the run over `--proxy-file`.
 * **HTTP 401 from a Scraping Browser endpoint.** The profile's credentials
-  have expired; they last about a day. Get fresh ones.
+  have expired. Get fresh ones.
 * **HTTP 500 `profile_locked` from a Scraping Browser endpoint.** The profile
   has one live connection and something still holds it, including a run that
   disconnected a second ago. Wait, or use another `pid`.

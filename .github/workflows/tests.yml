@@ -17,7 +17,7 @@ jobs:
       matrix:
         # 3.9 is the floor the README claims. Claiming it without testing it is
         # how a walrus operator or a `X | None` annotation ships and breaks it.
-        python-version: ["3.9", "3.12"]
+        python-version: ["3.9", "3.14"]
 
     steps:
       - uses: actions/checkout@v4

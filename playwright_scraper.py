@@ -81,7 +81,7 @@ logger = logging.getLogger("playwright_scraper")
 
 
 # Chromium's own names for a proxy that could not be used. Distinguished
-# from a timeout because the two want opposite responses (CLAUDE.md §8).
+# from a timeout because the two want opposite responses.
 _PROXY_ERROR_MARKERS = (
     "ERR_PROXY_CONNECTION_FAILED",
     "ERR_TUNNEL_CONNECTION_FAILED",
@@ -108,11 +108,11 @@ def _launch_local(pw, args, pool):
 
     No user agent is set. The browser's own is the one whose TLS handshake and
     client hints agree with it, and a bare override leaves those reporting the
-    real browser (§24). This site does not care either way, and the safe
+    real browser. This site does not care either way, and the safe
     default is the one that cannot be a contradiction.
 
     A proxy rotation tears the whole browser down and calls this again, so no
-    state issued against one exit is replayed from another (§8).
+    state issued against one exit is replayed from another.
     """
     launch_kwargs = {"headless": args.headless}
     proxy = to_playwright(pool.current) if pool else None
@@ -146,7 +146,7 @@ class _Ops:
     only HOW Playwright does each step.
 
     A rotation means a genuinely FRESH browser, never a proxy swapped under
-    a live session (§8).
+    a live session.
     """
 
     def __init__(self, pw, args, pool, remote: bool = False):
@@ -170,7 +170,7 @@ class _Ops:
         a browser built, which is also what `--dump-html` writes. `domcontent-
         loaded` is enough on this site, whose data is in the markup and whose
         scripts only wire up the vote arrows; waiting for `networkidle` would
-        wait on nothing (§24).
+        wait on nothing.
         """
         try:
             resp = self.page.goto(url, wait_until="domcontentloaded",
@@ -233,7 +233,7 @@ def _connect_remote(pw, args):
             break
     if browser is None:
         # The endpoint carries a password, and Playwright repeats it five
-        # times in its error text (§8). Rewritten with it masked, keeping
+        # times in its error text. Rewritten with it masked, keeping
         # host and port, which are the useful half.
         raise PWError(
             f"could not connect to --cdp-endpoint "
@@ -248,7 +248,7 @@ def _connect_remote(pw, args):
 
 # Every `scheme://user:pass@` in a string, however many times it occurs.
 # Matching GLOBALLY is the point: a Playwright connection error repeats the
-# endpoint five times (§8).
+# endpoint five times.
 _CREDENTIALS_IN_URL_RE = re.compile(r"([a-z][a-z0-9+.\-]*://)[^\s/@]+:[^\s/@]+@",
                                     re.IGNORECASE)
 
@@ -263,7 +263,7 @@ def _fetch_pages_concurrently(args, pool, query, page_nums, concurrency: int):
 
     Each worker owns its own Playwright instance, browser and exit: with the
     sync API a browser belongs to the thread that made it, so sharing one is
-    not an option even in principle (§7). The page loop itself is
+    not an option even in principle. The page loop itself is
     page_flow.worker_loop, shared by all three engines.
     """
     work = queue.Queue()
@@ -436,6 +436,9 @@ def parse_args(argv=None):
     p.add_argument("--headless", action="store_true", default=True)
     p.add_argument("--headful", dest="headless", action="store_false")
     args = p.parse_args(argv)
+    # Whether --url was TYPED, read before .env fills it: a URL from the
+    # environment is a default, and must not refuse the query flags.
+    args.typed_url = args.url
     env_config.apply(args)
     args.query = page_flow.build_query(args, p.error)
     args.mode = args.query.mode

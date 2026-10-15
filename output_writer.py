@@ -12,7 +12,7 @@ Three modes, three row classes
     --mode user      one profile                              -> User
 
 Three kinds of thing, so three dataclasses (the family allows a second one
-where a repo genuinely reads more than one kind, §9). What holds them
+where a repo genuinely reads more than one kind). What holds them
 together is the id: every class carries the site's own id in `sku`, which is
 the HN item id for a Story and a Comment (they are one id space: a comment's
 `story_id` and `parent_id` are Story ids or Comment ids), and the username
@@ -25,7 +25,7 @@ The dedupe key differs, and the sidecar's `mode` says which is in force:
     User      `sku` -- one row
 
 What a cross-mode `diff_runs.py` would mean is nothing: two runs of DIFFERENT
-modes hold different kinds of rows, and it refuses (§9).
+modes hold different kinds of rows, and it refuses.
 
 Something specific to a site whose text is written by its users: **every
 string in a Comment and a User was typed by a stranger.** That is why the
@@ -67,7 +67,7 @@ class Story:
     a story states.
 
     Columns that are null BY DESIGN on some rows, so a reader is not left to
-    guess (§9): `author`, `points` and `comments` are null on a job posting,
+    guess: `author`, `points` and `comments` are null on a job posting,
     which has none of the three -- a fact about the site, and the only way a
     row's `kind` is `job`. `rank` is the number the site prints beside the
     row, which continues across pages (page 2 starts at 31) and is null only
@@ -156,7 +156,7 @@ class User:
 # Kept under the family's name: the workflow files, a sibling's diff tool and
 # a user's script may say `Product`, and a rename that breaks them all for
 # the sake of tidiness is a poor trade. A Story is the row a listing run is
-# about, which is what `Product` means in the shop scrapers.
+# about, which is the role `Product` plays across the family.
 Product = Story
 
 ROW_CLASS_BY_MODE = {"listing": Story, "item": Comment, "user": User}
@@ -281,9 +281,8 @@ CSV_FORMULA_ESCAPE = "'"
 def _csv_value(v: Any) -> Any:
     if isinstance(v, (list, tuple)):
         return LIST_CSV_SEPARATOR.join(str(x) for x in v)
-    # `tags` and each entry of `variants` are mappings, and a Python repr
-    # of one is neither readable in a spreadsheet nor parseable by anything
-    # but Python.
+    # A mapping cell (no column here holds one today): a Python repr is
+    # neither readable in a spreadsheet nor parseable by anything but Python.
     # Compact JSON is both, and round-trips through json.loads.
     if isinstance(v, dict):
         return json.dumps(v, ensure_ascii=False, separators=(",", ":"))
