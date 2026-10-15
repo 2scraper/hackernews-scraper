@@ -9,6 +9,8 @@ said so at the top of its release notes.
 
 ## [Unreleased]
 
+## [0.1.0] — 2026-10-15
+
 > **A page that says it has rows and parses to none now exits 5 (or 6), not
 > 4 or 0.** When the markup moves, a page can still carry its own More link or
 > a comment count while the parser reads nothing from it. That used to be
@@ -19,43 +21,13 @@ said so at the top of its release notes.
 > when earlier pages had rows. The site's own "nothing here" sentences and a
 > real page past the end of a list are still exit 4 / end of list.
 
-### Fixed
-
-- **`cp .env.example .env` no longer breaks every query flag.** The example
-  set `HACKERNEWS_URL`, and a URL from the environment was treated as typed,
-  so `--feed show`, `--item 1` and `--mode user --user dang` were all refused
-  with exit 2. The example now ships it commented out, and in every entry
-  point a URL from the environment is a default: a typed query flag or
-  `--mode` wins over it. A typed `--url` with a query flag is still refused.
-- **More key shapes are masked in logged errors and the Scraper API's
-  `x-debug` header**: `clientKey: …` and JSON `"key": "…"` as well as
-  `key=…`.
-- Documentation: a Scraping Browser profile's credentials expire, but not on
-  a fixed one-day schedule; a 401 on connect is the signal to fetch fresh
-  ones. The exit-code table now says Selenium, which sees no HTTP status,
-  reports an unrecognised 403 page as exit 5 rather than 3.
-- Comments and docstrings state their reasons in their own words instead of
-  pointing at an unpublished document, and a check keeps it that way. Stale
-  comments describing other sites' columns were reworded.
-- CI tests the newest Python (3.14) beside the oldest (3.9).
-
-- **`--retries 0` sent no request and reported an unreadable page.** The flag
-  counts attempts and the loop is `while attempt < retries`, so zero attempts
-  fetched nothing and the run exited 5 with an empty debug file, which reads
-  exactly like a browser fault. Found by a third-party audit that ran
-  `--retries 0` and measured exit 5 against a curl that returned 200; the same
-  command without that flag returned 30 rows. It is now refused at parse time
-  with exit 2, like `--pages 0`.
-
-## [0.1.0] — 2026-09-30
-
-First release. Three modes over news.ycombinator.com's server-rendered pages,
-three browser engines and the 2Captcha Scraper API over one shared fetch loop.
-
 > **`--delay` defaults to 30 seconds**, the `Crawl-delay` the site's
 > `robots.txt` asks for. A three-page run therefore takes about a minute. Lower
 > it deliberately: more than fifty requests, mostly four seconds apart, drew no
 > throttle on 2026-09-30, which is one measurement and not a promise.
+
+First release. Three modes over news.ycombinator.com's server-rendered pages,
+three browser engines and the 2Captcha Scraper API over one shared fetch loop.
 
 ### Added
 
@@ -95,6 +67,33 @@ three browser engines and the 2Captcha Scraper API over one shared fetch loop.
   of the shared fetch loop with a fake driver, and a daily canary of all three
   modes that needs no secret.
 
+### Fixed
+
+- **`cp .env.example .env` no longer breaks every query flag.** The example
+  set `HACKERNEWS_URL`, and a URL from the environment was treated as typed,
+  so `--feed show`, `--item 1` and `--mode user --user dang` were all refused
+  with exit 2. The example now ships it commented out, and in every entry
+  point a URL from the environment is a default: a typed query flag or
+  `--mode` wins over it. A typed `--url` with a query flag is still refused.
+- **More key shapes are masked in logged errors and the Scraper API's
+  `x-debug` header**: `clientKey: …` and JSON `"key": "…"` as well as
+  `key=…`.
+- Documentation: a Scraping Browser profile's credentials expire, but not on
+  a fixed one-day schedule; a 401 on connect is the signal to fetch fresh
+  ones. The exit-code table now says Selenium, which sees no HTTP status,
+  reports an unrecognised 403 page as exit 5 rather than 3.
+- Comments and docstrings state their reasons in their own words instead of
+  pointing at an unpublished document, and a check keeps it that way. Stale
+  comments describing other sites' columns were reworded.
+- CI tests the newest Python (3.14) beside the oldest (3.9).
+- **`--retries 0` sent no request and reported an unreadable page.** The flag
+  counts attempts and the loop is `while attempt < retries`, so zero attempts
+  fetched nothing and the run exited 5 with an empty debug file, which reads
+  exactly like a browser fault. Found by a third-party audit that ran
+  `--retries 0` and measured exit 5 against a curl that returned 200; the same
+  command without that flag returned 30 rows. It is now refused at parse time
+  with exit 2, like `--pages 0`.
+
 ### Verified live (2026-09-30, from a datacentre address)
 
 - Every page kind answered HTTP 200 to plain `curl`, to headless Chromium, to
@@ -130,7 +129,6 @@ three browser engines and the 2Captcha Scraper API over one shared fetch loop.
 - **`diff_runs.py` would have reported "0 changed" on real changes.** Its mode
   came from a `mode` column of the rows, which none of these row classes has, so
   it tracked no columns at all.
-
 - CI, on the pushed branch (2026-09-30): the offline suite on Python 3.9 and
   3.12, each engine in its own virtualenv, the Docker build, and a manual
   dispatch of the canary from a GitHub runner (all four jobs passed).
