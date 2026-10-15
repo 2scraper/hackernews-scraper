@@ -9,7 +9,35 @@ said so at the top of its release notes.
 
 ## [Unreleased]
 
+> **A page that says it has rows and parses to none now exits 5 (or 6), not
+> 4 or 0.** When the markup moves, a page can still carry its own More link or
+> a comment count while the parser reads nothing from it. That used to be
+> reported as an empty answer: exit 4 on page 1, and on a later page the end
+> of the list, so a three-page run ended `complete`, exit 0, with a third of
+> the data. Such a page is now a failed page with `stop_reason:
+> parser_found_nothing`: exit 5 when nothing was gathered, exit 6 (partial)
+> when earlier pages had rows. The site's own "nothing here" sentences and a
+> real page past the end of a list are still exit 4 / end of list.
+
 ### Fixed
+
+- **`cp .env.example .env` no longer breaks every query flag.** The example
+  set `HACKERNEWS_URL`, and a URL from the environment was treated as typed,
+  so `--feed show`, `--item 1` and `--mode user --user dang` were all refused
+  with exit 2. The example now ships it commented out, and in every entry
+  point a URL from the environment is a default: a typed query flag or
+  `--mode` wins over it. A typed `--url` with a query flag is still refused.
+- **More key shapes are masked in logged errors and the Scraper API's
+  `x-debug` header**: `clientKey: …` and JSON `"key": "…"` as well as
+  `key=…`.
+- Documentation: a Scraping Browser profile's credentials expire, but not on
+  a fixed one-day schedule; a 401 on connect is the signal to fetch fresh
+  ones. The exit-code table now says Selenium, which sees no HTTP status,
+  reports an unrecognised 403 page as exit 5 rather than 3.
+- Comments and docstrings state their reasons in their own words instead of
+  pointing at an unpublished document, and a check keeps it that way. Stale
+  comments describing other sites' columns were reworded.
+- CI tests the newest Python (3.14) beside the oldest (3.9).
 
 - **`--retries 0` sent no request and reported an unreadable page.** The flag
   counts attempts and the loop is `while attempt < retries`, so zero attempts

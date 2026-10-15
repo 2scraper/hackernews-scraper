@@ -3,7 +3,7 @@
 #
 # No secrets are needed, and that is the point of running it: the README's
 # central claim is "no key, no proxy, no account", and an ungated scheduled
-# canary is that sentence under test every morning (CLAUDE.md §21, §24). Every
+# canary is that sentence under test every morning. Every
 # page kind answered a datacentre address normally when this repo was written
 # (2026-09-30); a GitHub runner is a datacentre address too. So this is NOT
 # gated on a secret: a canary that CAN pass without a credential must not be
@@ -83,7 +83,7 @@ jobs:
           playwright install --with-deps chromium
 
       # >= 3 pages on the listings, because with one page pagination is never
-      # exercised (§11).
+      # exercised.
       - name: Run
         id: run
         run: |
@@ -100,8 +100,8 @@ jobs:
           case "$code" in
             0) ;;
             3) echo "::error::Blocked (HTTP 403). HN has never refused an address this repo used, so this is a new state: the runner's address was refused. Set the HACKERNEWS_PROXY secret (see the header)."; exit 1 ;;
-            4) echo "::error::Zero rows from a page that is never empty. Either the markup has moved (see canary_dump.html*) or the site answered with its own 'nothing there' sentence."; exit 1 ;;
-            5) echo "::error::The page never arrived. This job uses no credential, so this is not an expired key: a timeout or a throttle that did not lift. Check the log."; exit 1 ;;
+            4) echo "::error::Zero rows from a page that is never empty: the site answered with its own 'nothing there' sentence, or a page past the end (see canary_dump.html*)."; exit 1 ;;
+            5) echo "::error::No rows were obtained. Either the page never arrived (this job uses no credential, so not an expired key: a timeout or a throttle that did not lift) or it arrived and parsed to none (stop_reason parser_found_nothing: the markup moved, see canary_page*_debug.html). Check the log."; exit 1 ;;
             6) echo "::error::Partial run: a page failed after others succeeded. The sidecar names it."; exit 1 ;;
             *) echo "::error::Unexpected exit $code."; exit 1 ;;
           esac

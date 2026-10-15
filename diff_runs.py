@@ -62,8 +62,7 @@ from output_writer import ROW_CLASS_BY_MODE, UNIQUE_BY_SKU_MODES
 # ARE the story's figures.) `depth` and `parent_id` never change for a
 # comment, and stay tracked so a re-parenting would show.
 UNTRACKED_FIELDS = frozenset({
-    "source", "scraped_at", "sku", "page", "position", "rank", "mode", "sort",
-    "data_source", "url",
+    "source", "scraped_at", "sku", "page", "position", "rank", "url",
 })
 
 

@@ -29,7 +29,7 @@ How each paginates, which decides what `--concurrency` can do:
 
 The site says which it is on every page: the "More" link is
 `<a class="morelink" rel="next">`, and comparing its href with what `?p=N`
-would build is how page_flow decides (§7) instead of trusting a table.
+would build is how page_flow decides instead of trusting a table.
 
 Facts measured that the code depends on, each one a way this scraper would
 otherwise be wrong while looking healthy:
@@ -45,8 +45,8 @@ otherwise be wrong while looking healthy:
   every one.
 * **Some parameters are answered with plausible data.** `front?day=garbage`
   serves the latest day, and `news?p=abc` and `news?p=0` serve page 1, all
-  HTTP 200. So `day` and `p` are validated here BEFORE anything is sent
-  (§26): a typo must not become a healthy-looking run of the wrong thing.
+  HTTP 200. So `day` and `p` are validated here BEFORE anything is sent:
+  a typo must not become a healthy-looking run of the wrong thing.
 * **"Nothing there" is plain text, not markup.** `item?id=99999999999` is the
   13 bytes `No such item.`, an unknown user is `No such user.`, a `front` day
   in the future is `We don't have that data yet.`, before HN existed is
@@ -57,7 +57,7 @@ otherwise be wrong while looking healthy:
   posting has none of the three; a story with no comments says `discuss`,
   which is zero, not unknown.
 
-Nothing in here imports a browser (§1).
+Nothing in here imports a browser.
 """
 
 import html as html_lib
@@ -218,7 +218,7 @@ def request_for(query: Query, page_num: int, url: Optional[str] = None) -> Reque
     """The request for page `page_num` of `query`.
 
     `url` overrides the address: a cursor list's page 2 is only known from
-    page 1's own More link, so the loop hands that in (§7).
+    page 1's own More link, so the loop hands that in.
     """
     if url:
         return Request(url=url, label=url)
@@ -378,7 +378,7 @@ NOT_FOUND_SENTENCES = (
 # Sent when a client is too fast. NOT OBSERVED by this repo: no request made
 # while measuring drew it, at 4 s gaps over ~50 fetches on 2026-09-30. It is
 # here because it is what the site is known to say, and a throttle is retried
-# at the same exit while a block is not (§24).
+# at the same exit while a block is not.
 THROTTLE_SENTENCE = "we're not able to serve your requests this quickly"
 
 _TAG_RE = re.compile(r"<[^>]+>")
@@ -392,7 +392,7 @@ def references_own_markup(html: str) -> bool:
     """Whether the page is built out of HN's own table.
 
     Every served page has `<table id="hnmain">`; Chromium's network-error
-    page, a proxy's interstitial and a CDN block page do not. This is the §8
+    page, a proxy's interstitial and a CDN block page do not. This is the
     "a served page is built out of the site's own assets" test, applied to
     markup because the site loads nothing from anywhere else (its CSP is
     `default-src 'self'` plus reCAPTCHA on /login).
@@ -409,10 +409,16 @@ def detect_bot_challenge(html: str, url: str = "") -> Optional[str]:
     one third party, reCAPTCHA, which it loads on /login and not on any page
     this scraper reads. Kept as the family's entry point so a future
     refusal has a place to be named; it deliberately matches nothing today
-    rather than guessing at markers nobody has seen (§18). This repo does not
+    rather than guessing at markers nobody has seen. This repo does not
     implement captcha solving: there has been nothing to solve.
     """
     return None
+
+
+def site_said_nothing(html: str) -> bool:
+    """The site's own short "nothing here" answer (`No such item.` etc.)."""
+    text = html or ""
+    return len(text) < 600 and _text_of(text).lower() in NOT_FOUND_SENTENCES
 
 
 def detect_page_state(html: str, status: Optional[int] = None,
@@ -428,7 +434,7 @@ def detect_page_state(html: str, status: Optional[int] = None,
                     proxy interstitial), or a page of its own markup that
                     holds neither rows nor the site's "nothing" answer
 
-    Ordered by how much each signal PROVES, not by how cheap it is (§17):
+    Ordered by how much each signal PROVES, not by how cheap it is:
     the site's own sentence and its own rows first, the status second.
     """
     text = html or ""
@@ -440,7 +446,7 @@ def detect_page_state(html: str, status: Optional[int] = None,
     if not text.strip():
         return "unknown"
 
-    if len(text) < 600 and _text_of(text).lower() in NOT_FOUND_SENTENCES:
+    if site_said_nothing(text):
         return "empty"
 
     if not references_own_markup(text):
@@ -626,8 +632,8 @@ def parse_listing(html: str, *, page: Optional[int] = None) -> List[Story]:
     """Story rows from a listing page, in page order.
 
     `position` counts the rows this function EMITS, from 1 on every page, so
-    `page`+`position` is unique across a run (§18) and does not depend on how
-    many rows the page held that could not be read (§24).
+    `page`+`position` is unique across a run and does not depend on how
+    many rows the page held that could not be read.
     """
     soup = BeautifulSoup(html or "", "html.parser")
     rows: List[Story] = []

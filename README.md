@@ -217,10 +217,10 @@ long link. `status` is `ok`, `flagged`, `dead` or `deleted`.
 | 0 | ok |
 | 1 | crash |
 | 2 | bad usage (a flag combination that would scrape something nobody asked for) |
-| 3 | blocked: HTTP 403 (not observed here) |
-| 4 | zero rows: nothing there, a list past its end, or a served page that parsed to none (that last one is a bug in this repo and is logged as one) |
-| 5 | the content was never obtained: a timeout, a dead proxy, a throttle that never lifted, a remote API error |
-| 6 | partial: some pages arrived and then the run stopped; `pages_failed` in the sidecar names them |
+| 3 | blocked: HTTP 403 (not observed here). Selenium sees no HTTP status, so a 403 whose body is not HN's own page reaches it as an unreadable page and ends exit 5 instead |
+| 4 | zero rows: nothing there, or a list that starts past its end |
+| 5 | the content was never obtained: a timeout, a dead proxy, a throttle that never lifted, a remote API error, or a served page that says it has rows (a More link, a comment count) and parsed to none (`stop_reason: parser_found_nothing`, a bug in this repo) |
+| 6 | partial: some pages arrived and then the run stopped, including on a later page that parsed to none; `pages_failed` in the sidecar names them |
 
 `<out>.meta.json` records `status` (`complete`, `partial`, `failed`),
 `stop_reason`, `pages_requested`, `pages_completed`, `pages_failed`, the query,
@@ -265,8 +265,8 @@ secret in `argv` is readable by anything that can run `ps`). Copy
 Precedence: explicit flag, then exported variable, then `.env`, then default.
 `python3 env_config.py` prints what was picked up without printing a secret.
 
-A Scraping Browser profile's credentials last about a day, so none is written
-down anywhere in this repo; the endpoint's shape is in `.env.example`.
+A Scraping Browser profile's credentials expire (a 401 on connect means it is
+time to fetch fresh ones), so none is written down anywhere in this repo; the endpoint's shape is in `.env.example`.
 
 ## Tests, CI and the container
 

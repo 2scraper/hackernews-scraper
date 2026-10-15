@@ -88,7 +88,7 @@ CREDENTIAL_ALLOWED = (
 # A 2captcha API key is a 32-character hex string.
 HEX32 = re.compile(r"\b[0-9a-f]{32}\b")
 
-# EMPTY, and that is the stricter arrangement rather than an omission (§24).
+# EMPTY, and that is the stricter arrangement rather than an omission.
 #
 # Nothing news.ycombinator.com publishes is a 32-hex string: its ids are
 # decimal integers (`item?id=49901736`), its usernames are words, and the two
@@ -210,8 +210,8 @@ SCANNED_SUFFIXES = (".py", ".md", ".txt", ".yml", ".yaml", ".example")
 #
 # A suffix allowlist is a scanner that cannot see the thing most likely to
 # leak. `--dump-html live_results` writes `live_results.page1` — no suffix
-# the list knew — and a merge committed two of them, 1.5 MB each, carrying 26
-# per-seller UUIDs, 12 copies of the site's Algolia key and its Sentry keys.
+# the list knew — and in a sibling repo a merge committed two of them, 1.5 MB
+# each, carrying that site's front-end keys.
 # The check that exists to stop exactly that ran, passed, and never opened
 # them.
 #
@@ -273,7 +273,7 @@ def tracked_files():
 # into pip's vendored code and flags a 32-hex string in `_elffile.py` as
 # key-shaped. Correct about the string, wrong about the file — and it is the
 # FIRST thing a new user sees from `python3 smoke_test.py`. A guard people
-# have to argue with is one they learn to suppress (CLAUDE.md §22).
+# have to argue with is one they learn to suppress.
 #
 # Deliberately NOT a narrowing of what gets scanned: an untracked file is
 # still read, because a key pasted into a scratch file beside the scripts is
