@@ -9,6 +9,12 @@ said so at the top of its release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- CI only: the canary's optional paid secret `HACKERNEWS_PROXY` now reaches it only on a new weekly
+  run (Mondays 05:40 UTC) and on a manual dispatch. The daily run keeps its
+  schedule and takes the free route without them, so it bills nothing.
+
 ## [0.1.0] — 2026-10-15
 
 > **A page that says it has rows and parses to none now exits 5 (or 6), not
