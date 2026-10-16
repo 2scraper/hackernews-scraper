@@ -86,7 +86,7 @@ history needs a decision, not a red check on every push.
 Then the rest of the presentation, in the order that matters:
 
 1. `python3 smoke_test.py` green, and the canary dispatched at least once.
-   It runs daily with no secrets at all and is expected to be green, because
+   It runs weekly (Mondays) with no secrets at all and is expected to be green, because
    no mode needs a credential and a green badge there is exactly the claim
    the README makes.
 2. The repo description, homepage and topics set (see the family notes on
@@ -154,7 +154,7 @@ news.ycombinator.com, be gentle with it:
   not for a loop. Never loop a live run. About fifty requests spaced 4 s
   apart drew no throttle on 2026-09-30, from one datacentre address, which is
   one measurement.
-* **The canary is the scheduled live check.** It is three pages daily from a
+* **The canary is the scheduled live check.** It is three pages weekly (Mondays) from a
   GitHub runner and needs no secret.
 
 Say in the PR what you ran (engine, mode, URL), and what you got, including
