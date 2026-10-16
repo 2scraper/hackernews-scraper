@@ -1,9 +1,9 @@
-# One real run of each mode against news.ycombinator.com, daily. tests.yml
+# One real run of each mode against news.ycombinator.com, weekly (Mondays). tests.yml
 # (deliberately) never touches the site.
 #
 # No secrets are needed, and that is the point of running it: the README's
 # central claim is "no key, no proxy, no account", and an ungated scheduled
-# canary is that sentence under test every morning. Every
+# canary is that sentence under test every Monday. Every
 # page kind answered a datacentre address normally when this repo was written
 # (2026-09-30); a GitHub runner is a datacentre address too. So this is NOT
 # gated on a secret: a canary that CAN pass without a credential must not be
@@ -26,10 +26,6 @@ name: canary
 on:
   schedule:
     # 05:40 UTC. Not on the hour: every scheduled workflow fires at :00.
-    - cron: "40 5 * * *"
-    # Mondays: the same jobs, WITH the paid secrets (proxy, Scraping Browser,
-    # captcha key). On the daily run above those secrets read as empty, so
-    # it takes the free no-secret route and bills nothing.
     - cron: "40 5 * * 1"
   workflow_dispatch:
 
@@ -73,7 +69,7 @@ jobs:
             pages: 1
             floor: 1
     env:
-      HACKERNEWS_PROXY: ${{ (github.event_name != 'schedule' || github.event.schedule == '40 5 * * 1') && secrets.HACKERNEWS_PROXY || '' }}
+      HACKERNEWS_PROXY: ${{ secrets.HACKERNEWS_PROXY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

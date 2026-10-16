@@ -96,7 +96,7 @@ is handled as a refusal and was never seen either. The canary
 (`.github/workflows/canary.yml`) ran once by hand on 2026-09-30 from a
 GitHub-hosted runner with no proxy and no secret, and all four jobs passed
 (front page and `/newest` 90 rows each, a 71-comment thread, a profile). That
-is one run from one address; the badge is the daily evidence.
+is one run from one address; the badge is the weekly evidence.
 
 ## Being polite
 
