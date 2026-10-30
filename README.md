@@ -1,4 +1,4 @@
-# hackernews-scraper
+# Hacker News Scraper — Stories, Comment Trees and Profiles in Python
 
 [![release](https://img.shields.io/github/v/release/2scraper/hackernews-scraper?display_name=tag&sort=semver)](https://github.com/2scraper/hackernews-scraper/releases)
 [![tests](https://github.com/2scraper/hackernews-scraper/actions/workflows/tests.yml/badge.svg)](https://github.com/2scraper/hackernews-scraper/actions/workflows/tests.yml)
@@ -7,6 +7,8 @@
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![engines](https://img.shields.io/badge/engines-Playwright%20%7C%20Selenium%20%7C%20Puppeteer%20%7C%20Scraper%20API-informational)
 ![no account](https://img.shields.io/badge/runs%20without%20an%20account-yes-brightgreen)
+
+**Hacker News scraper** — an open-source (MIT) Python tool that reads news.ycombinator.com story lists, item pages and user profiles and writes stories, whole comment trees and profiles to JSON or CSV. Measured on 2026-09-30 from a datacentre VPS, it needed no key, no proxy and no account. Use it to build a dataset of stories and discussions, or compare two runs of the same feed with `diff_runs.py`.
 
 Scrapes **news.ycombinator.com** — story lists, whole comment trees and
 profiles — to JSON and CSV, with Playwright, Selenium, Puppeteer (pyppeteer),
@@ -290,6 +292,23 @@ files, and the image holds no `.env`, test suite or fixtures.
 docker build -t hackernews-scraper .
 docker run --rm -v "$PWD/out:/out" hackernews-scraper --feed show --pages 2 --out /out/show
 ```
+
+## Guides
+
+- [How to run the 2scraper scrapers: setup, proxies, exit codes and access modes](https://2captcha.com/h/how-to-run-2scraper-open-source-scrapers) — installation, `.env`, `.meta.json` for the whole family.
+
+## Related scrapers
+
+Same CLI conventions, same output contract (one row per item, JSON or CSV, a `.meta.json` sidecar and shared exit codes):
+
+- [Medium scraper](https://github.com/2scraper/medium-scraper) — Tag feeds, day archives, author pages and full story text…
+- [Perplexity scraper](https://github.com/2scraper/perplexity-scraper) — Pages and Discover articles
+- [Quora scraper](https://github.com/2scraper/quora-scraper) — Answers from question pages, topic feeds and profiles…
+- [Goodreads scraper](https://github.com/2scraper/goodreads-scraper) — Lists, author books, search, full book pages and every…
+- [Instagram scraper](https://github.com/2scraper/instagram-scraper) — Public profiles, posts and Reels, read logged out
+- [Snapchat scraper](https://github.com/2scraper/snapchat-scraper) — Public Snapchat profiles, Spotlight engagement and story…
+
+All scrapers: [github.com/2scraper](https://github.com/2scraper) · Need another site? [Open a request](https://github.com/2scraper/.github/issues/new?title=%5BScraper%20request%5D%20)
 
 ## Licence
 
